@@ -1,0 +1,142 @@
+.TH JUKEBOX 1 2026-10-20 "commonjukebox 0.1" "User Commands"
+.SH NAME
+jukebox \- opinionated way to manage a music library
+.SH SYNOPSIS
+.B jukebox
+.I command
+[\fIflags\fR] [\fIargs\fR...]
+.br
+.B jukebox
+.BR \-h " | " \-\-help " | " help
+.SH DESCRIPTION
+.B jukebox
+lists, searches and tags music files in a music library.
+Files are found by extension
+.RI ( .flac ", " .ogg ", " .opus ,
+case-insensitive) anywhere under the library directory.
+.PP
+The library directory is set once with
+.BR "jukebox init" ,
+or given to each command with
+.BR \-\-library .
+Flags may be written with one or two dashes and must come before the
+command's arguments.
+.SH COMMANDS
+.TP
+.BR init " [" \-\-force "] [" \-\-codec " \fIname\fR] \fIdir\fR"
+Store
+.I dir
+(made absolute, with a leading
+.B ~
+expanded) as the library in the config file, and create the library's
+settings file if it is missing.
+Prints how many audio files were found and warns if there are none.
+.RS
+.TP
+.B \-\-force
+Replace a different library that is already set.
+.TP
+.BI \-\-codec " name"
+Codec the library stores new tracks in:
+.BR flac ", " opus " or " vorbis .
+A new settings file defaults to
+.BR flac ;
+an existing one is only changed when this flag is given.
+.RE
+.TP
+.BR list " [" \-\-library " \fIpath\fR] [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-genre " \fIX\fR]"
+Print every track in the library, sorted by artist, album and track number,
+as
+.RI \(lq artist " \(em " album " \(em " track ". " title \(rq.
+The filters match the whole tag, ignoring case, and may be combined.
+.TP
+.BR search " [" \-\-library " \fIpath\fR] \fItext\fR..."
+Print the tracks whose artist, album or title contains
+.I text
+(the arguments joined by spaces), ignoring case.
+Output is the same as for
+.BR list .
+.TP
+.BI "tag show " path\fR...
+Print every tag of each audio file in the given files and directories.
+Does not use the library.
+.TP
+.BR "tag set" " [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-title " \fIX\fR] [" \-\-genre " \fIX\fR] [" \-\-track " \fIN\fR] [" \-\-year " \fIN\fR] \fIpath\fR..."
+Write tags to each audio file in the given files and directories.
+Only the flags that are passed are changed; an empty value removes the tag.
+The flags set the
+.BR ARTIST ", " ALBUM ", " TITLE ", " GENRE ", " TRACKNUMBER " and " DATE
+tags.
+At least one flag is required.
+Does not use the library.
+.SH OPTIONS
+.TP
+.BI \-\-library " path"
+Use
+.I path
+as the library instead of the one in the config file.
+Accepted by
+.B list
+and
+.BR search .
+.TP
+.BR \-h ", " \-\-help
+Show a usage summary and exit.
+After a command, show that command's flags.
+.SH FILES
+.TP
+.I $XDG_CONFIG_HOME/commonjukebox/config
+User config file, by default
+.IR ~/.config/commonjukebox/config .
+Lines have the form
+.IR "key " = " value" ;
+blank lines and lines starting with
+.B #
+are ignored.
+The only key is
+.BR library ,
+the path of the music library; a leading
+.B ~
+is expanded.
+.TP
+.I library/.jukebox/config
+Library settings file, in the same format, kept inside the library so it
+travels with it.
+The only key is
+.BR codec .
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+The command failed.
+.TP
+.B 2
+Usage error, such as an unknown command or flag.
+.SH EXAMPLES
+Set the library once, storing new tracks as Opus:
+.PP
+.RS
+.EX
+jukebox init \-\-codec opus ~/Music
+.EE
+.RE
+.PP
+List one album and search the whole library:
+.PP
+.RS
+.EX
+jukebox list \-\-artist Radiohead \-\-album "OK Computer"
+jukebox search paranoid
+.EE
+.RE
+.PP
+Tag a directory of files and check the result:
+.PP
+.RS
+.EX
+jukebox tag set \-\-artist Radiohead \-\-year 1997 ~/Downloads/okc
+jukebox tag show ~/Downloads/okc
+.EE
+.RE
