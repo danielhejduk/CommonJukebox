@@ -248,44 +248,99 @@ var tagFlags = map[string]string{
 	"year":   "DATE",
 }
 
+// perTrackFlags are tags that differ between tracks, so setting one value on
+// many files at once is almost always a mistake.
+var perTrackFlags = []string{"title", "track"}
+
 func runTagSet(args []string) error {
 	fs := flag.NewFlagSet("tag set", flag.ExitOnError)
 	for name, key := range tagFlags {
 		fs.String(name, "", "set "+key+" (empty removes it)")
 	}
+	dryRun := fs.Bool("dry-run", false, "print what would change without writing")
+	force := fs.Bool("force", false, "allow --title or --track on more than one file")
 	fs.Parse(args)
 
-	// Only flags that were actually passed are changed.
+	// Only tag flags that were actually passed are changed.
 	changes := map[string]string{}
-	fs.Visit(func(f *flag.Flag) { changes[tagFlags[f.Name]] = f.Value.String() })
+	var perTrack []string
+	fs.Visit(func(f *flag.Flag) {
+		if key, ok := tagFlags[f.Name]; ok {
+			changes[key] = f.Value.String()
+		}
+		if slices.Contains(perTrackFlags, f.Name) {
+			perTrack = append(perTrack, "--"+f.Name)
+		}
+	})
 	if len(changes) == 0 || fs.NArg() == 0 {
-		return errors.New("usage: jukebox tag set [--artist X] [--album X] [--title X] [--genre X] [--track N] [--year N] <file|dir>...")
+		return errors.New("usage: jukebox tag set [--dry-run] [--force] [--artist X] [--album X] [--title X] [--genre X] [--track N] [--year N] <file|dir>...")
 	}
 
-	return forEachFile(fs.Args(), func(file string) error {
+	files, errs := collectFiles(fs.Args())
+	if len(perTrack) > 0 && len(files) > 1 && !*force {
+		return fmt.Errorf("%s would give %d files the same value; pass --force if you mean it", strings.Join(perTrack, " and "), len(files))
+	}
+
+	errs = append(errs, eachFile(files, func(file string) error {
+		if *dryRun {
+			fmt.Println("would update", file)
+			return nil
+		}
 		if err := tags.Write(file, changes); err != nil {
 			return err
 		}
 		fmt.Println("updated", file)
 		return nil
-	})
+	})...)
+	return joinErrors(errs)
 }
 
 // forEachFile calls fn for every audio file in paths; directories are searched.
+// It keeps going after errors and returns all of them at the end.
 func forEachFile(paths []string, fn func(file string) error) error {
+	files, errs := collectFiles(paths)
+	errs = append(errs, eachFile(files, fn)...)
+	return joinErrors(errs)
+}
+
+// collectFiles returns every audio file in paths, plus an error for each path
+// that can't be scanned or holds no audio files.
+func collectFiles(paths []string) ([]string, []error) {
+	var files []string
+	var errs []error
 	for _, p := range paths {
-		files, err := library.Scan(p)
+		found, err := library.Scan(p)
 		if err != nil {
-			return err
+			errs = append(errs, err)
+			continue
 		}
-		if len(files) == 0 {
-			return fmt.Errorf("%s: no audio files", p)
+		if len(found) == 0 {
+			errs = append(errs, fmt.Errorf("%s: no audio files", p))
+			continue
 		}
-		for _, f := range files {
-			if err := fn(f); err != nil {
-				return err
-			}
+		files = append(files, found...)
+	}
+	return files, errs
+}
+
+// eachFile calls fn for every file and returns the errors it reported.
+func eachFile(files []string, fn func(file string) error) []error {
+	var errs []error
+	for _, f := range files {
+		if err := fn(f); err != nil {
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errs
+}
+
+// joinErrors combines errs into one error that reports how many there were.
+func joinErrors(errs []error) error {
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	}
+	return fmt.Errorf("%d errors:\n%w", len(errs), errors.Join(errs...))
 }

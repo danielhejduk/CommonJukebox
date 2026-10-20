@@ -61,13 +61,27 @@ Output is the same as for
 Print every tag of each audio file in the given files and directories.
 Does not use the library.
 .TP
-.BR "tag set" " [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-title " \fIX\fR] [" \-\-genre " \fIX\fR] [" \-\-track " \fIN\fR] [" \-\-year " \fIN\fR] \fIpath\fR..."
+.BR "tag set" " [" \-\-dry\-run "] [" \-\-force "] [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-title " \fIX\fR] [" \-\-genre " \fIX\fR] [" \-\-track " \fIN\fR] [" \-\-year " \fIN\fR] \fIpath\fR..."
 Write tags to each audio file in the given files and directories.
 Only the flags that are passed are changed; an empty value removes the tag.
 The flags set the
 .BR ARTIST ", " ALBUM ", " TITLE ", " GENRE ", " TRACKNUMBER " and " DATE
 tags.
-At least one flag is required.
+At least one tag flag is required.
+.RS
+.TP
+.B \-\-dry\-run
+Print the files that would be updated without writing anything.
+.TP
+.B \-\-force
+Allow
+.BR \-\-title " or " \-\-track
+when the paths contain more than one file.
+Without it, such a command is refused, since every file would get the same value.
+.RE
+.IP
+Errors on individual files do not stop the others;
+all errors are reported at the end and the exit status is 1.
 Does not use the library.
 .SH OPTIONS
 .TP
