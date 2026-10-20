@@ -45,7 +45,7 @@ an existing one is only changed when this flag is given.
 .RE
 .TP
 .BR list " [" \-\-library " \fIpath\fR] [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-genre " \fIX\fR]"
-Print every track in the library, sorted by artist, album and track number,
+Print every track in the library, sorted by album artist (or artist when it is missing), album, disc and track number, ignoring case,
 as
 .RI \(lq artist " \(em " album " \(em " track ". " title \(rq.
 The filters match the whole tag, ignoring case, and may be combined.
@@ -58,7 +58,8 @@ Output is the same as for
 .BR list .
 .TP
 .BI "tag show " path\fR...
-Print every tag of each audio file in the given files and directories.
+Print the artist, album artist, album, title, disc, track, year and genre
+of each audio file in the given files and directories; missing tags are left out.
 Does not use the library.
 .TP
 .BR "tag set" " [" \-\-dry\-run "] [" \-\-force "] [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-title " \fIX\fR] [" \-\-genre " \fIX\fR] [" \-\-track " \fIN\fR] [" \-\-year " \fIN\fR] \fIpath\fR..."

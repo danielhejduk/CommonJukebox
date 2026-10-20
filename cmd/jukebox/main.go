@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/danielhejduk/commonjukebox/internal/config"
@@ -162,7 +163,7 @@ func runSearch(args []string) error {
 }
 
 // loadTracks reads the tags of every audio file in the library, sorted by
-// artist, album and track number. Unreadable files are reported and skipped.
+// compareTracks. Unreadable files are reported and skipped.
 func loadTracks(root string) ([]tags.Track, error) {
 	files, err := library.Scan(root)
 	if err != nil {
@@ -179,14 +180,31 @@ func loadTracks(root string) ([]tags.Track, error) {
 		tracks = append(tracks, t)
 	}
 
-	slices.SortFunc(tracks, func(a, b tags.Track) int {
-		return cmp.Or(
-			cmp.Compare(a.Artist, b.Artist),
-			cmp.Compare(a.Album, b.Album),
-			cmp.Compare(a.Track, b.Track),
-		)
-	})
+	slices.SortFunc(tracks, compareTracks)
 	return tracks, nil
+}
+
+// compareTracks orders tracks by album artist (falling back to artist, so a
+// compilation stays together), album, disc and track number. Text is compared
+// ignoring case.
+func compareTracks(a, b tags.Track) int {
+	return cmp.Or(
+		compareText(sortArtist(a), sortArtist(b)),
+		compareText(a.Album, b.Album),
+		cmp.Compare(a.Disc, b.Disc),
+		cmp.Compare(a.Track, b.Track),
+		cmp.Compare(a.Path, b.Path),
+	)
+}
+
+func sortArtist(t tags.Track) string {
+	return cmp.Or(t.AlbumArtist, t.Artist)
+}
+
+// compareText compares ignoring case, falling back to the exact text so the
+// order is stable when two strings differ only in case.
+func compareText(a, b string) int {
+	return cmp.Or(cmp.Compare(strings.ToLower(a), strings.ToLower(b)), cmp.Compare(a, b))
 }
 
 // matches reports whether got equals want, ignoring case. An empty want matches anything.
@@ -226,16 +244,37 @@ func runTagShow(paths []string) error {
 		return errors.New("usage: jukebox tag show <file|dir>...")
 	}
 	return forEachFile(paths, func(file string) error {
-		comments, err := tags.Comments(file)
+		t, err := tags.Read(file)
 		if err != nil {
 			return err
 		}
 		fmt.Println(file)
-		for _, c := range comments {
-			fmt.Println("  " + c)
+		for _, f := range []struct {
+			name, value string
+		}{
+			{"Artist", t.Artist},
+			{"Album artist", t.AlbumArtist},
+			{"Album", t.Album},
+			{"Title", t.Title},
+			{"Disc", number(t.Disc)},
+			{"Track", number(t.Track)},
+			{"Year", t.Year},
+			{"Genre", t.Genre},
+		} {
+			if f.value != "" {
+				fmt.Printf("  %-13s %s\n", f.name+":", f.value)
+			}
 		}
 		return nil
 	})
+}
+
+// number formats n for display; 0 means missing and gives "".
+func number(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
 }
 
 // tagFlags maps each "tag set" flag to the tag it writes.

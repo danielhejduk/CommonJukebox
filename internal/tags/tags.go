@@ -14,13 +14,15 @@ import (
 )
 
 type Track struct {
-	Path   string
-	Genre  string
-	Artist string
-	Album  string
-	Title  string
-	Track  int    // 0 if missing or not a number
-	Year   string // first 4 characters of DATE
+	Path        string
+	Genre       string
+	Artist      string
+	AlbumArtist string // empty if missing
+	Album       string
+	Title       string
+	Disc        int    // 0 if missing or not a number
+	Track       int    // 0 if missing or not a number
+	Year        string // first 4 characters of DATE
 }
 
 var errUnsupported = errors.New("unsupported file type")
@@ -65,9 +67,12 @@ func Read(path string) (Track, error) {
 		}
 	}
 
-	// TRACKNUMBER is "6" or "6/12".
-	num, _, _ := strings.Cut(tags["TRACKNUMBER"], "/")
-	track, _ := strconv.Atoi(num)
+	// TRACKNUMBER and DISCNUMBER are "6" or "6/12".
+	number := func(key string) int {
+		num, _, _ := strings.Cut(tags[key], "/")
+		n, _ := strconv.Atoi(num)
+		return n
+	}
 
 	year := tags["DATE"]
 	if len(year) > 4 {
@@ -75,13 +80,15 @@ func Read(path string) (Track, error) {
 	}
 
 	return Track{
-		Path:   path,
-		Genre:  tags["GENRE"],
-		Artist: tags["ARTIST"],
-		Album:  tags["ALBUM"],
-		Title:  tags["TITLE"],
-		Track:  track,
-		Year:   year,
+		Path:        path,
+		Genre:       tags["GENRE"],
+		Artist:      tags["ARTIST"],
+		AlbumArtist: tags["ALBUMARTIST"],
+		Album:       tags["ALBUM"],
+		Title:       tags["TITLE"],
+		Disc:        number("DISCNUMBER"),
+		Track:       number("TRACKNUMBER"),
+		Year:        year,
 	}, nil
 }
 
