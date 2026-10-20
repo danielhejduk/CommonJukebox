@@ -17,6 +17,7 @@ import (
 const usage = `Usage: jukebox <command> [flags]
 
 Commands:
+  init       Set the library path in the config file
   list       List tracks in the library
   search     Search tracks by artist, album or title
   tag        Show or set tags (tag show | tag set)
@@ -27,6 +28,7 @@ Run "jukebox <command> -h" for command flags.
 type command func(args []string) error
 
 var commands = map[string]command{
+	"init":   runInit,
 	"list":   runList,
 	"search": runSearch,
 	"tag":    runTag,
@@ -67,6 +69,51 @@ func newFlagSet(name string) (*flag.FlagSet, *string) {
 func parseWithConfig(fs *flag.FlagSet, lib *string, args []string) (config.Config, error) {
 	fs.Parse(args)
 	return config.Load(*lib)
+}
+
+// runInit writes the library path to the config file, so other commands
+// don't need --library.
+func runInit(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	force := fs.Bool("force", false, "replace a library that is already set")
+	codec := fs.String("codec", "", "codec for the library: "+strings.Join(config.Codecs, ", ")+" (default "+config.DefaultSettings().Codec+")")
+	fs.Parse(args)
+	if fs.NArg() != 1 {
+		return errors.New("usage: jukebox init [--force] [--codec name] <dir>")
+	}
+
+	lib, err := config.AbsPath(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(lib)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s: not a directory", lib)
+	}
+
+	files, err := library.Scan(lib)
+	if err != nil {
+		return err
+	}
+	// Settings first, so a library we can't write to doesn't become the default.
+	settings, err := config.InitSettings(lib, *codec)
+	if err != nil {
+		return err
+	}
+	path, err := config.SetLibrary(lib, *force)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("library set to %s in %s (%d audio files)\n", lib, path, len(files))
+	fmt.Printf("codec %s in %s\n", settings.Codec, config.SettingsPath(lib))
+	if len(files) == 0 {
+		fmt.Fprintln(os.Stderr, "warning: no .flac, .ogg or .opus files found")
+	}
+	return nil
 }
 
 func runList(args []string) error {
