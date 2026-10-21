@@ -6,6 +6,6 @@ Features:
 - [X] Searching in a music library
 - [X] Showing and setting tags
 - [X] Checking tags for errors and duplicates
-- [ ] Adding new music
+- [X] Adding new music
 - [ ] Re-encoding the music library
 - [ ] Rsync integration

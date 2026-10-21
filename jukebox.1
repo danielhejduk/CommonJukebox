@@ -9,6 +9,13 @@ jukebox \- opinionated music library manager
 .IR name ]
 .I dir
 .br
+.B jukebox add
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RB [ \-\-force ]
+.IR path ...
+.br
 .B jukebox list
 .RB [ \-\-library
 .IR path ]
@@ -110,6 +117,72 @@ A new settings file gets
 .B flac
 unless this flag is given;
 an existing settings file is only changed when it is.
+.B add
+converts lossless tracks to this codec.
+.SS add
+.B jukebox add
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RB [ \-\-force ]
+.IR path ...
+.PP
+Copy every audio file in the given files and directories into the library as
+.PP
+.RS
+.IR genre / "album artist" / album / "NN" ". " title . ext
+.RE
+.PP
+using
+.B ARTIST
+when
+.B ALBUMARTIST
+is not set.
+The track number has at least two digits.
+If any track in the same source directory has a disc number above 1,
+the file name starts with the disc number, as in
+.BR "2\-03. Title.flac" .
+A
+.B /
+in a tag becomes
+.BR _ ,
+and leading dots and surrounding spaces are removed.
+The source files are never changed.
+.PP
+FLAC files are converted with
+.BR ffmpeg (1)
+when the library's codec is
+.B opus
+or
+.BR vorbis .
+Files that are already lossy are copied as they are, with a warning if their
+codec differs from the library's, since converting them again would lose
+quality.
+.PP
+When standard input is a terminal,
+.B add
+asks for tags the path needs and that are missing:
+genre, album artist and album once for each source directory,
+and artist, title and track number for each track.
+Press Enter to accept the value in brackets.
+The answers are written to the copy in the library.
+Otherwise, tracks without those tags are reported and skipped.
+.PP
+Before copying, the tracks are checked together with those already in their
+album directories, using the rules of
+.BR check .
+Any problem stops
+.B add
+before it copies anything.
+.TP
+.B \-\-dry\-run
+Print each source, its destination and whether it would be copied or converted.
+Nothing is asked or written.
+.TP
+.B \-\-force
+Add the tracks even if the check finds problems,
+and replace files that already exist in the library.
+Without it, an existing file is reported and left alone.
 .SS list
 .B jukebox list
 .RB [ \-\-library

@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bufio"
 	"cmp"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/danielhejduk/commonjukebox/internal/add"
 	"github.com/danielhejduk/commonjukebox/internal/config"
 	"github.com/danielhejduk/commonjukebox/internal/library"
 	"github.com/danielhejduk/commonjukebox/internal/tags"
@@ -20,6 +24,7 @@ const usage = `Usage: jukebox <command> [flags]
 
 Commands:
   init       Set the library path in the config file
+  add        Copy new music into the library
   list       List tracks in the library
   search     Search tracks by artist, album or title
   tag        Show or set tags (tag show | tag set)
@@ -32,6 +37,7 @@ type command func(args []string) error
 
 var commands = map[string]command{
 	"init":   runInit,
+	"add":    runAdd,
 	"list":   runList,
 	"search": runSearch,
 	"tag":    runTag,
@@ -118,6 +124,102 @@ func runInit(args []string) error {
 		fmt.Fprintln(os.Stderr, "warning: no .flac, .ogg or .opus files found")
 	}
 	return nil
+}
+
+// runAdd copies files into the library, converting lossless ones to the
+// library's codec and asking for tags the destination path needs.
+func runAdd(args []string) error {
+	fs, lib := newFlagSet("add")
+	dryRun := fs.Bool("dry-run", false, "print where files would go without copying or asking")
+	force := fs.Bool("force", false, "add despite check problems and replace existing files")
+	cfg, err := parseWithConfig(fs, lib, args)
+	if err != nil {
+		return err
+	}
+	if fs.NArg() == 0 {
+		return errors.New("usage: jukebox add [--library path] [--dry-run] [--force] <file|dir>...")
+	}
+
+	files, errs := collectFiles(fs.Args())
+	var ask add.Prompter
+	if !*dryRun {
+		ask = stdinPrompter()
+	}
+	items, planErrs := add.Plan(cfg.Library, cfg.Settings, files, ask)
+	errs = append(errs, planErrs...)
+
+	for _, it := range items {
+		if !it.Transcode && it.Codec != cfg.Settings.Codec {
+			fmt.Fprintf(os.Stderr, "warning: %s: %s is lossy, adding it without converting to %s\n", it.Src, it.Codec, cfg.Settings.Codec)
+		}
+	}
+	problems := add.Validate(items)
+	for _, p := range problems {
+		fmt.Println(p)
+	}
+	if len(problems) > 0 && !*force {
+		errs = append(errs, fmt.Errorf("%d problems found; fix the tags or pass --force", len(problems)))
+	}
+
+	if *dryRun {
+		for _, it := range items {
+			action := "copy"
+			if it.Transcode {
+				action = "transcode " + it.Codec
+			}
+			fmt.Printf("%s -> %s [%s]\n", it.Src, it.Dest, action)
+		}
+		return joinErrors(errs)
+	}
+	if len(problems) > 0 && !*force {
+		return joinErrors(errs)
+	}
+
+	if slices.ContainsFunc(items, func(it add.Item) bool { return it.Transcode }) {
+		if _, err := exec.LookPath("ffmpeg"); err != nil {
+			return joinErrors(append(errs, fmt.Errorf("converting to %s needs ffmpeg: %w", cfg.Settings.Codec, err)))
+		}
+	}
+	for _, it := range items {
+		if err := add.Execute(it, *force); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		fmt.Println("added", it.Dest)
+	}
+	return joinErrors(errs)
+}
+
+// stdinPrompter asks on the terminal, or returns nil when stdin isn't one so
+// scripts never wait for input. Character devices like /dev/null pass the
+// check, so end of input counts as no answer from then on.
+func stdinPrompter() add.Prompter {
+	info, err := os.Stdin.Stat()
+	if err != nil || info.Mode()&os.ModeCharDevice == 0 {
+		return nil
+	}
+	r := bufio.NewReader(os.Stdin)
+	eof := false
+	return func(question, def string) (string, error) {
+		if eof {
+			return "", nil
+		}
+		if def != "" {
+			fmt.Fprintf(os.Stderr, "%s [%s]: ", question, def)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s: ", question)
+		}
+		line, err := r.ReadString('\n')
+		if errors.Is(err, io.EOF) {
+			fmt.Fprintln(os.Stderr)
+			eof = true
+			return strings.TrimSpace(line), nil
+		}
+		if err != nil {
+			return "", err
+		}
+		return cmp.Or(strings.TrimSpace(line), def), nil
+	}
 }
 
 func runList(args []string) error {
