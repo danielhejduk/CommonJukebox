@@ -48,7 +48,7 @@ func TestWrite(t *testing.T) {
 				data, _ := os.ReadFile("testdata/" + name)
 				os.WriteFile(path, data, 0o644)
 
-				err := Write(path, map[string]string{"TITLE": title, "GENRE": "", "DATE": "1999"})
+				err := Write(path, map[string]string{"TITLE": title, "GENRE": "", "DATE": "1999", "LYRICS": "line one\nline two"})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -57,7 +57,7 @@ func TestWrite(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				want := Track{Path: path, Artist: "Kanye West", Album: "ye [E]", Title: title, Track: 6, Year: "1999"}
+				want := Track{Path: path, Artist: "Kanye West", Album: "ye [E]", Title: title, Track: 6, Year: "1999", Lyrics: "line one\nline two"}
 				if got != want {
 					t.Errorf("got  %+v\nwant %+v", got, want)
 				}

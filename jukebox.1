@@ -1,136 +1,379 @@
-.TH JUKEBOX 1 2026-10-20 "commonjukebox 0.1" "User Commands"
+'\" t
+.TH JUKEBOX 1 2026-10-21 "commonjukebox 0.1" "User Commands"
 .SH NAME
-jukebox \- opinionated way to manage a music library
+jukebox \- opinionated music library manager
 .SH SYNOPSIS
-.B jukebox
-.I command
-[\fIflags\fR] [\fIargs\fR...]
+.B jukebox init
+.RB [ \-\-force ]
+.RB [ \-\-codec
+.IR name ]
+.I dir
+.br
+.B jukebox list
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-artist
+.IR text ]
+.RB [ \-\-album
+.IR text ]
+.RB [ \-\-genre
+.IR text ]
+.br
+.B jukebox search
+.RB [ \-\-library
+.IR path ]
+.IR text ...
+.br
+.B jukebox check
+.RB [ \-\-library
+.IR path ]
+.br
+.B jukebox tag show
+.IR path ...
+.br
+.B jukebox tag set
+.RI [ flags ]
+.IR path ...
 .br
 .B jukebox
-.BR \-h " | " \-\-help " | " help
+.RB [ \-h | \-\-help | help ]
 .SH DESCRIPTION
 .B jukebox
-lists, searches and tags music files in a music library.
-Files are found by extension
-.RI ( .flac ", " .ogg ", " .opus ,
-case-insensitive) anywhere under the library directory.
+lists, searches, checks and tags the tracks of a music library.
 .PP
-The library directory is set once with
-.BR "jukebox init" ,
-or given to each command with
-.BR \-\-library .
-Flags may be written with one or two dashes and must come before the
-command's arguments.
+A library is a directory.
+Every file under it whose name ends in
+.BR .flac ,
+.B .ogg
+or
+.B .opus
+(in any case) is a track, however deeply it is nested.
+Other files are ignored.
+.PP
+The library is set once with
+.B jukebox init
+and stored in the config file, so later commands find it on their own.
+.BR list ,
+.B search
+and
+.B check
+accept
+.B \-\-library
+to use a different one for a single run.
+.B tag
+works on the paths it is given and does not use the library at all.
+.PP
+Flags may be written with one or two dashes.
+They must come before the command's other arguments:
+the first argument that is not a flag ends the flags.
 .SH COMMANDS
-.TP
-.BR init " [" \-\-force "] [" \-\-codec " \fIname\fR] \fIdir\fR"
-Store
+.SS init
+.B jukebox init
+.RB [ \-\-force ]
+.RB [ \-\-codec
+.IR name ]
 .I dir
-(made absolute, with a leading
+.PP
+Make
+.I dir
+the library.
+A leading
 .B ~
-expanded) as the library in the config file, and create the library's
-settings file if it is missing.
-Prints how many audio files were found and warns if there are none.
-.RS
+is expanded and the path is made absolute, so the stored library does not
+depend on the directory
+.B jukebox
+is later run from.
+.PP
+The library's settings file is created if it is missing, then
+.I dir
+is written to the config file; other lines in the config file are kept.
+.B init
+prints where both were stored and how many tracks it found,
+and warns if there were none.
 .TP
 .B \-\-force
 Replace a different library that is already set.
+Without it,
+.B init
+refuses to change the library.
+Running it again with the same
+.I dir
+is always allowed.
 .TP
 .BI \-\-codec " name"
-Codec the library stores new tracks in:
-.BR flac ", " opus " or " vorbis .
-A new settings file defaults to
-.BR flac ;
-an existing one is only changed when this flag is given.
-.RE
-.TP
-.BR list " [" \-\-library " \fIpath\fR] [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-genre " \fIX\fR]"
-Print every track in the library, sorted by album artist (or artist when it is missing), album, disc and track number, ignoring case,
-as
-.RI \(lq artist " \(em " album " \(em " track ". " title \(rq.
-The filters match the whole tag, ignoring case, and may be combined.
-.TP
-.BR search " [" \-\-library " \fIpath\fR] \fItext\fR..."
-Print the tracks whose artist, album or title contains
-.I text
-(the arguments joined by spaces), ignoring case.
-Output is the same as for
-.BR list .
-.TP
-.BI "tag show " path\fR...
-Print the artist, album artist, album, title, disc, track, year and genre
-of each audio file in the given files and directories; missing tags are left out.
-Does not use the library.
-.TP
-.BR "tag set" " [" \-\-dry\-run "] [" \-\-force "] [" \-\-artist " \fIX\fR] [" \-\-album " \fIX\fR] [" \-\-title " \fIX\fR] [" \-\-genre " \fIX\fR] [" \-\-track " \fIN\fR] [" \-\-year " \fIN\fR] \fIpath\fR..."
-Write tags to each audio file in the given files and directories.
-Only the flags that are passed are changed; an empty value removes the tag.
-The flags set the
-.BR ARTIST ", " ALBUM ", " TITLE ", " GENRE ", " TRACKNUMBER " and " DATE
-tags.
-At least one tag flag is required.
+The codec the library stores new tracks in:
+.BR flac ,
+.B opus
+or
+.BR vorbis .
+A new settings file gets
+.B flac
+unless this flag is given;
+an existing settings file is only changed when it is.
+.SS list
+.B jukebox list
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-artist
+.IR text ]
+.RB [ \-\-album
+.IR text ]
+.RB [ \-\-genre
+.IR text ]
+.PP
+Print the tracks of the library, one per line, as
+.PP
 .RS
+.IR artist " \(em " album " \(em " track ". " title
+.RE
+.PP
+Tracks are sorted by album artist (or artist, when the album artist is
+missing, so a compilation stays together), then album, disc number and track
+number.
+Text is compared ignoring case.
+.PP
+.BR \-\-artist ,
+.B \-\-album
+and
+.B \-\-genre
+keep only the tracks whose tag is exactly
+.IR text ,
+ignoring case.
+Several filters may be combined; a track must match all of them.
+.PP
+Files whose tags cannot be read are reported on standard error and skipped.
+.SS search
+.B jukebox search
+.RB [ \-\-library
+.IR path ]
+.IR text ...
+.PP
+Print the tracks whose artist, album or title contains
+.IR text ,
+ignoring case.
+Several arguments are joined with spaces into one search text, so quoting is
+not needed.
+Output, order and handling of unreadable files are the same as for
+.BR list .
+.SS check
+.B jukebox check
+.RB [ \-\-library
+.IR path ]
+.PP
+Look for mistakes in the tags of the library and print one line for each
+problem, as
+.PP
+.RS
+.IR path ": " rule ": " message
+.RE
+.PP
+followed by a summary of how many tracks were scanned and how many problems
+were found.
+The exit status is 1 if there was at least one problem.
+.PP
+Tracks are grouped into albums by the directory they are in;
+tracks without an
+.B ALBUM
+tag do not belong to any album.
+The rules are:
+.TP
+.B unreadable
+The file's tags could not be read.
+The file is left out of the other checks.
+.TP
+.B missing\-tag
+A track has no
+.BR ARTIST ,
+.BR ALBUM ,
+.B TITLE
+or
+.B TRACKNUMBER
+tag, its
+.B TRACKNUMBER
+is not a number, or a track that belongs to an album has no
+.BR ALBUMARTIST .
+.TP
+.B duplicate\-track
+Two tracks in the same album have the same disc and track number.
+The message names the track that had it first.
+.TP
+.B missing\-track
+A disc of an album does not have every track from 1 up to its highest track
+number.
+The path is the album's directory.
+.SS "tag show"
+.B jukebox tag show
+.IR path ...
+.PP
+For every track among the given files and directories, print its path
+followed by its artist, album artist, album, title, disc, track, year and
+genre, then its lyrics, one indented line per line of text.
+Tags that are not set are left out.
+.SS "tag set"
+.B jukebox tag set
+.RB [ \-\-dry\-run ]
+.RB [ \-\-force ]
+.RB [ \-\-artist
+.IR text ]
+.RB [ \-\-album
+.IR text ]
+.RB [ \-\-title
+.IR text ]
+.RB [ \-\-genre
+.IR text ]
+.RB [ \-\-track
+.IR n ]
+.RB [ \-\-year
+.IR n ]
+.IR path ...
+.PP
+Change the tags of every track among the given files and directories.
+Only the tags whose flags are given are changed; every other tag is kept.
+Giving a flag an empty value, as in
+.BR "\-\-genre \(dq\(dq" ,
+removes that tag.
+At least one tag flag is required.
+.PP
+Each file is rewritten to a temporary file next to it, which then replaces
+the original, so an interrupted write never leaves a damaged track.
+The path of each updated file is printed.
+.TP
+.BI \-\-artist " text"
+Set
+.BR ARTIST .
+.TP
+.BI \-\-album " text"
+Set
+.BR ALBUM .
+.TP
+.BI \-\-title " text"
+Set
+.BR TITLE .
+.TP
+.BI \-\-genre " text"
+Set
+.BR GENRE .
+.TP
+.BI \-\-track " n"
+Set
+.BR TRACKNUMBER .
+.TP
+.BI \-\-year " n"
+Set
+.BR DATE .
 .TP
 .B \-\-dry\-run
-Print the files that would be updated without writing anything.
+Print the files that would be updated, but do not change them.
 .TP
 .B \-\-force
 Allow
-.BR \-\-title " or " \-\-track
-when the paths contain more than one file.
-Without it, such a command is refused, since every file would get the same value.
+.B \-\-title
+or
+.B \-\-track
+when the paths hold more than one track.
+Without it the command is refused, since every track would get the same
+title or number, which is almost always a mistake.
+.SS "Paths and errors in tag"
+A
+.I path
+given to
+.B tag show
+or
+.B tag set
+may be a track or a directory, which is searched the same way as the library.
+A path that cannot be read or holds no tracks is an error.
+An error on one file does not stop the others:
+all errors are printed at the end and the exit status is 1.
+.SH TAGS
+.B jukebox
+reads and writes Vorbis comments, the tag format of FLAC, Ogg Vorbis and
+Opus files.
+It uses these tags:
+.PP
+.RS
+.TS
+l l.
+ARTIST	artist of the track
+ALBUMARTIST	artist of the whole album
+ALBUM	album title
+TITLE	track title
+TRACKNUMBER	track number, as \fIn\fR or \fIn\fR/\fItotal\fR
+DISCNUMBER	disc number, as \fIn\fR or \fIn\fR/\fItotal\fR
+DATE	release date; its first four characters are the year
+GENRE	genre
+LYRICS	lyrics, shown by \fBtag show\fR
+.TE
 .RE
-.IP
-Errors on individual files do not stop the others;
-all errors are reported at the end and the exit status is 1.
-Does not use the library.
+.PP
+Tag names are matched ignoring case.
+When a tag appears more than once, the first value is used.
 .SH OPTIONS
 .TP
 .BI \-\-library " path"
 Use
 .I path
 as the library instead of the one in the config file.
+A leading
+.B ~
+is expanded.
 Accepted by
-.B list
+.BR list ,
+.B search
 and
-.BR search .
+.BR check .
 .TP
 .BR \-h ", " \-\-help
-Show a usage summary and exit.
-After a command, show that command's flags.
+Without a command, or as the command
+.BR help ,
+print the list of commands.
+After a command, print that command's flags.
 .SH FILES
 .TP
 .I $XDG_CONFIG_HOME/commonjukebox/config
-User config file, by default
+The user's config file, by default
 .IR ~/.config/commonjukebox/config .
-Lines have the form
-.IR "key " = " value" ;
-blank lines and lines starting with
-.B #
-are ignored.
-The only key is
+It is written by
+.BR "jukebox init" .
+Its only key is
 .BR library ,
-the path of the music library; a leading
-.B ~
-is expanded.
+the path of the library.
 .TP
-.I library/.jukebox/config
-Library settings file, in the same format, kept inside the library so it
-travels with it.
-The only key is
-.BR codec .
+.IB library /.jukebox/config
+The library's settings file.
+It is kept inside the library so the settings travel with it.
+Its only key is
+.BR codec ,
+which is
+.BR flac ,
+.B opus
+or
+.BR vorbis ;
+when the file is missing,
+.B flac
+is used.
+.PP
+Both files have one
+.IB key " = " value
+setting per line.
+Blank lines and lines starting with
+.B #
+are ignored, as are unknown keys.
 .SH EXIT STATUS
 .TP
 .B 0
 Success.
 .TP
 .B 1
-The command failed.
+The command failed, or
+.B check
+found problems.
 .TP
 .B 2
-Usage error, such as an unknown command or flag.
+No command, an unknown command or an invalid flag.
 .SH EXAMPLES
-Set the library once, storing new tracks as Opus:
+Make
+.I ~/Music
+the library and store new tracks as Opus:
 .PP
 .RS
 .EX
@@ -138,20 +381,37 @@ jukebox init \-\-codec opus ~/Music
 .EE
 .RE
 .PP
-List one album and search the whole library:
+List one album, then search the whole library:
 .PP
 .RS
 .EX
 jukebox list \-\-artist Radiohead \-\-album "OK Computer"
-jukebox search paranoid
+jukebox search paranoid android
 .EE
 .RE
 .PP
-Tag a directory of files and check the result:
+Look for missing tags and tracks:
 .PP
 .RS
 .EX
+jukebox check
+.EE
+.RE
+.PP
+Tag a downloaded album, trying it out first, and look at the result:
+.PP
+.RS
+.EX
+jukebox tag set \-\-dry\-run \-\-artist Radiohead \-\-year 1997 ~/Downloads/okc
 jukebox tag set \-\-artist Radiohead \-\-year 1997 ~/Downloads/okc
 jukebox tag show ~/Downloads/okc
+.EE
+.RE
+.PP
+Remove the genre from one track:
+.PP
+.RS
+.EX
+jukebox tag set \-\-genre "" ~/Music/okc/01.flac
 .EE
 .RE

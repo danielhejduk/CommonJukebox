@@ -303,6 +303,17 @@ func runTagShow(paths []string) error {
 				fmt.Printf("  %-13s %s\n", f.name+":", f.value)
 			}
 		}
+		// Lyrics span many lines, so they go last, each line indented.
+		if lyrics := strings.TrimSpace(strings.ReplaceAll(t.Lyrics, "\r\n", "\n")); lyrics != "" {
+			fmt.Println("  Lyrics:")
+			for _, line := range strings.Split(lyrics, "\n") {
+				if line == "" {
+					fmt.Println()
+				} else {
+					fmt.Println("    " + line)
+				}
+			}
+		}
 		return nil
 	})
 }

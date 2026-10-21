@@ -23,6 +23,7 @@ type Track struct {
 	Disc        int    // 0 if missing or not a number
 	Track       int    // 0 if missing or not a number
 	Year        string // first 4 characters of DATE
+	Lyrics      string
 }
 
 var errUnsupported = errors.New("unsupported file type")
@@ -89,6 +90,7 @@ func Read(path string) (Track, error) {
 		Disc:        number("DISCNUMBER"),
 		Track:       number("TRACKNUMBER"),
 		Year:        year,
+		Lyrics:      tags["LYRICS"],
 	}, nil
 }
 
