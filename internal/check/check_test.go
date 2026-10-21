@@ -66,6 +66,108 @@ func TestCheck(t *testing.T) {
 	}
 }
 
+// numbered returns a complete track at path with the given disc and track number.
+func numbered(path string, disc, number int) tags.Track {
+	tr := track(path)
+	tr.Disc, tr.Track = disc, number
+	return tr
+}
+
+func TestDuplicateTrack(t *testing.T) {
+	tests := []struct {
+		name   string
+		tracks []tags.Track
+		want   []Problem
+	}{
+		{
+			name:   "distinct",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/2.flac", 0, 2)},
+		},
+		{
+			name:   "duplicate",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/2.flac", 0, 1)},
+			want:   []Problem{{"a/2.flac", "duplicate-track", "track 1 is also used by a/1.flac"}},
+		},
+		{
+			name:   "duplicate on disc",
+			tracks: []tags.Track{numbered("a/1.flac", 2, 1), numbered("a/2.flac", 2, 1)},
+			want:   []Problem{{"a/2.flac", "duplicate-track", "disc 2 track 1 is also used by a/1.flac"}},
+		},
+		{
+			name:   "same number on other discs",
+			tracks: []tags.Track{numbered("a/1.flac", 1, 1), numbered("a/2.flac", 2, 1)},
+		},
+		{
+			name:   "same number in other albums",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("b/1.flac", 0, 1)},
+		},
+		{
+			name:   "three times",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/2.flac", 0, 1), numbered("a/3.flac", 0, 1)},
+			want: []Problem{
+				{"a/2.flac", "duplicate-track", "track 1 is also used by a/1.flac"},
+				{"a/3.flac", "duplicate-track", "track 1 is also used by a/1.flac"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Check(tt.tracks)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMissingTrack(t *testing.T) {
+	tests := []struct {
+		name   string
+		tracks []tags.Track
+		want   []Problem
+	}{
+		{
+			name:   "complete",
+			tracks: []tags.Track{numbered("a/2.flac", 0, 2), numbered("a/1.flac", 0, 1)},
+		},
+		{
+			name:   "one missing",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/3.flac", 0, 3)},
+			want:   []Problem{{"a", "missing-track", "track 2 is missing"}},
+		},
+		{
+			name:   "several missing",
+			tracks: []tags.Track{numbered("a/2.flac", 0, 2), numbered("a/5.flac", 0, 5)},
+			want:   []Problem{{"a", "missing-track", "tracks 1, 3, 4 are missing"}},
+		},
+		{
+			name: "per disc",
+			tracks: []tags.Track{
+				numbered("a/1-1.flac", 1, 1),
+				numbered("a/1-2.flac", 1, 2),
+				numbered("a/2-2.flac", 2, 2),
+			},
+			want: []Problem{{"a", "missing-track", "disc 2 track 1 is missing"}},
+		},
+		{
+			// checkTrack reports the missing number; it is not counted as a gap.
+			name:   "no track number",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/x.flac", 0, 0)},
+			want:   []Problem{{"a/x.flac", "missing-tag", "TRACKNUMBER is not set or not a number"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Check(tt.tracks)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGroupAlbums(t *testing.T) {
 	noAlbum := track("c/1.flac")
 	noAlbum.Album = ""

@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -73,10 +74,50 @@ func checkTrack(t tags.Track) []Problem {
 }
 
 func checkAlbum(a Album) []Problem {
-	// TODO: duplicate-track, missing-track, inconsistent-tag, missing-albumartist
+	// TODO: inconsistent-tag, missing-albumartist
 	var problems []Problem
+	seen := map[[2]int]string{} // {disc, track} -> path of the first track with it
 	for _, t := range a.Tracks {
 		problems = require(problems, t.Path, t.AlbumArtist, "ALBUMARTIST is not set")
+
+		if t.Track == 0 {
+			continue // checkTrack reports it
+		}
+		key := [2]int{t.Disc, t.Track}
+		if first, ok := seen[key]; ok {
+			msg := fmt.Sprintf("track %d is also used by %s", t.Track, first)
+			if t.Disc != 0 {
+				msg = fmt.Sprintf("disc %d %s", t.Disc, msg)
+			}
+			problems = append(problems, Problem{t.Path, "duplicate-track", msg})
+			continue
+		}
+		seen[key] = t.Path
+	}
+
+	// Every disc should have tracks 1 to its highest track number.
+	last := map[int]int{} // disc -> highest track number
+	for key := range seen {
+		last[key[0]] = max(last[key[0]], key[1])
+	}
+	for _, disc := range slices.Sorted(maps.Keys(last)) {
+		var missing []string
+		for n := 1; n <= last[disc]; n++ {
+			if _, ok := seen[[2]int{disc, n}]; !ok {
+				missing = append(missing, strconv.Itoa(n))
+			}
+		}
+		if len(missing) == 0 {
+			continue
+		}
+		msg := "track " + missing[0] + " is missing"
+		if len(missing) > 1 {
+			msg = "tracks " + strings.Join(missing, ", ") + " are missing"
+		}
+		if disc != 0 {
+			msg = fmt.Sprintf("disc %d %s", disc, msg)
+		}
+		problems = append(problems, Problem{a.Dir, "missing-track", msg})
 	}
 	return problems
 }
