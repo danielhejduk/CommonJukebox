@@ -168,6 +168,67 @@ func TestMissingTrack(t *testing.T) {
 	}
 }
 
+func TestInconsistentTag(t *testing.T) {
+	with := func(path string, number int, set func(*tags.Track)) tags.Track {
+		tr := numbered(path, 0, number)
+		set(&tr)
+		return tr
+	}
+	same := func(*tags.Track) {}
+
+	tests := []struct {
+		name   string
+		tracks []tags.Track
+		want   []Problem
+	}{
+		{
+			name:   "consistent",
+			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/2.flac", 0, 2)},
+		},
+		{
+			name: "odd one out",
+			tracks: []tags.Track{
+				with("a/1.flac", 1, same),
+				with("a/2.flac", 2, func(t *tags.Track) { t.Album = "OK Computr" }),
+				with("a/3.flac", 3, same),
+			},
+			want: []Problem{{"a/2.flac", "inconsistent-tag", `ALBUM is "OK Computr", other tracks use "OK Computer"`}},
+		},
+		{
+			name: "tie goes to the first value",
+			tracks: []tags.Track{
+				with("a/1.flac", 1, func(t *tags.Track) { t.Year = "1997" }),
+				with("a/2.flac", 2, func(t *tags.Track) { t.Year = "1998" }),
+			},
+			want: []Problem{{"a/2.flac", "inconsistent-tag", `year is "1998", other tracks use "1997"`}},
+		},
+		{
+			// A blank value is not a different value; missing-tag covers it.
+			name: "blank",
+			tracks: []tags.Track{
+				with("a/1.flac", 1, func(t *tags.Track) { t.Year = "1997" }),
+				with("a/2.flac", 2, same),
+			},
+		},
+		{
+			name: "other albums",
+			tracks: []tags.Track{
+				with("a/1.flac", 1, same),
+				with("b/1.flac", 1, func(t *tags.Track) { t.AlbumArtist = "Portishead" }),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Check(tt.tracks)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGroupAlbums(t *testing.T) {
 	noAlbum := track("c/1.flac")
 	noAlbum.Album = ""

@@ -74,7 +74,7 @@ func checkTrack(t tags.Track) []Problem {
 }
 
 func checkAlbum(a Album) []Problem {
-	// TODO: inconsistent-tag, missing-albumartist
+	// TODO: missing-albumartist
 	var problems []Problem
 	seen := map[[2]int]string{} // {disc, track} -> path of the first track with it
 	for _, t := range a.Tracks {
@@ -118,6 +118,46 @@ func checkAlbum(a Album) []Problem {
 			msg = fmt.Sprintf("disc %d %s", disc, msg)
 		}
 		problems = append(problems, Problem{a.Dir, "missing-track", msg})
+	}
+	return append(problems, checkConsistency(a)...)
+}
+
+// albumTags are the tags every track of an album should share.
+var albumTags = []struct {
+	name  string
+	value func(tags.Track) string
+}{
+	{"ALBUM", func(t tags.Track) string { return t.Album }},
+	{"ALBUMARTIST", func(t tags.Track) string { return t.AlbumArtist }},
+	{"year", func(t tags.Track) string { return t.Year }},
+}
+
+// checkConsistency reports every track whose album tag differs from the value
+// most tracks of the album use. Blank values are skipped.
+func checkConsistency(a Album) []Problem {
+	var problems []Problem
+	for _, tag := range albumTags {
+		count := map[string]int{}
+		common := "" // most used value; the first one seen wins a tie
+		for _, t := range a.Tracks {
+			v := tag.value(t)
+			if strings.TrimSpace(v) == "" {
+				continue
+			}
+			count[v]++
+			if count[v] > count[common] {
+				common = v
+			}
+		}
+		if len(count) < 2 {
+			continue
+		}
+		for _, t := range a.Tracks {
+			if v := tag.value(t); strings.TrimSpace(v) != "" && v != common {
+				msg := fmt.Sprintf("%s is %q, other tracks use %q", tag.name, v, common)
+				problems = append(problems, Problem{t.Path, "inconsistent-tag", msg})
+			}
+		}
 	}
 	return problems
 }
