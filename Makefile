@@ -2,7 +2,7 @@ PREFIX ?= /usr
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
-.PHONY: all jukebox install uninstall clean
+.PHONY: all jukebox install uninstall test clean
 
 all: jukebox
 
@@ -16,6 +16,9 @@ install: jukebox
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/jukebox
 	rm -f $(DESTDIR)$(MANDIR)/man1/jukebox.1
+
+test:
+	go test -v ./...
 
 clean:
 	rm -f jukebox
