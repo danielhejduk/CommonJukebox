@@ -74,7 +74,6 @@ func checkTrack(t tags.Track) []Problem {
 }
 
 func checkAlbum(a Album) []Problem {
-	// TODO: missing-albumartist
 	var problems []Problem
 	seen := map[[2]int]string{} // {disc, track} -> path of the first track with it
 	for _, t := range a.Tracks {
