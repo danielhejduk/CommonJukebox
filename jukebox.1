@@ -35,6 +35,11 @@ jukebox \- opinionated music library manager
 .RB [ \-\-library
 .IR path ]
 .br
+.B jukebox transcode
+.RB [ \-\-library
+.IR path ]
+.I src dst
+.br
 .B jukebox tag show
 .IR path ...
 .br
@@ -61,9 +66,10 @@ The library is set once with
 .B jukebox init
 and stored in the config file, so later commands find it on their own.
 .BR list ,
-.B search
-and
+.BR search ,
 .B check
+and
+.B transcode
 accept
 .B \-\-library
 to use a different one for a single run.
@@ -281,6 +287,26 @@ A track's
 .B ALBUMARTIST
 or year differs from the one most tracks of its album use.
 Tracks without the tag are not compared.
+.SS transcode
+.B jukebox transcode
+.RB [ \-\-library
+.IR path ]
+.I src dst
+.PP
+Encode the audio of
+.I src
+into
+.I dst
+with the library's codec, using
+.BR ffmpeg (1).
+Tags are copied; other streams, such as cover art, are dropped.
+.I dst
+is overwritten if it exists.
+The library is only read for its codec;
+.I src
+and
+.I dst
+may be anywhere.
 .SS "tag show"
 .B jukebox tag show
 .IR path ...
@@ -398,9 +424,10 @@ A leading
 is expanded.
 Accepted by
 .BR list ,
-.B search
+.BR search ,
+.B check
 and
-.BR check .
+.BR transcode .
 .TP
 .BR \-h ", " \-\-help
 Without a command, or as the command

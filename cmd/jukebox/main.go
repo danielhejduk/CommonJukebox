@@ -14,10 +14,11 @@ import (
 	"strings"
 
 	"github.com/danielhejduk/commonjukebox/internal/add"
+	"github.com/danielhejduk/commonjukebox/internal/check"
 	"github.com/danielhejduk/commonjukebox/internal/config"
 	"github.com/danielhejduk/commonjukebox/internal/library"
 	"github.com/danielhejduk/commonjukebox/internal/tags"
-	"github.com/danielhejduk/commonjukebox/internal/check"
+	"github.com/danielhejduk/commonjukebox/internal/transcode"
 )
 
 const usage = `Usage: jukebox <command> [flags]
@@ -29,6 +30,7 @@ Commands:
   search     Search tracks by artist, album or title
   tag        Show or set tags (tag show | tag set)
   check      Check tags for errors and duplicates
+  transcode  Encode a file with the configured codec
 
 Run "jukebox <command> -h" for command flags.
 `
@@ -36,12 +38,13 @@ Run "jukebox <command> -h" for command flags.
 type command func(args []string) error
 
 var commands = map[string]command{
-	"init":   runInit,
-	"add":    runAdd,
-	"list":   runList,
-	"search": runSearch,
-	"tag":    runTag,
-	"check":  runCheck,
+	"init":      runInit,
+	"add":       runAdd,
+	"list":      runList,
+	"search":    runSearch,
+	"tag":       runTag,
+	"check":     runCheck,
+	"transcode": runTranscode,
 }
 
 func main() {
@@ -377,6 +380,18 @@ func runCheck(args []string) error {
 		return fmt.Errorf("%d problems found", len(problems))
 	}
 	return nil
+}
+
+func runTranscode(args []string) error {
+	fs, lib := newFlagSet("transcode")
+	cfg, err := parseWithConfig(fs, lib, args)
+	if err != nil {
+		return err
+	}
+	if fs.NArg() != 2 {
+		return errors.New("usage: jukebox transcode [--library path] <src> <dst>")
+	}
+	return transcode.Transcode(fs.Arg(0), fs.Arg(1), cfg.Settings.Codec)
 }
 
 func runTagShow(paths []string) error {
