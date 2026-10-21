@@ -130,7 +130,7 @@ func Write(path string, changes map[string]string) error {
 	defer os.Remove(tmp.Name()) // no-op after a successful rename
 
 	if _, err := tmp.Write(out); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {
@@ -203,11 +203,11 @@ func parseComments(b []byte) (vendor string, comments []string, err error) {
 func encodeComments(vendor string, comments []string) []byte {
 	var b bytes.Buffer
 	put := func(s string) {
-		binary.Write(&b, binary.LittleEndian, uint32(len(s)))
+		_ = binary.Write(&b, binary.LittleEndian, uint32(len(s)))
 		b.WriteString(s)
 	}
 	put(vendor)
-	binary.Write(&b, binary.LittleEndian, uint32(len(comments)))
+	_ = binary.Write(&b, binary.LittleEndian, uint32(len(comments)))
 	for _, c := range comments {
 		put(c)
 	}
