@@ -13,6 +13,7 @@ import (
 	"github.com/danielhejduk/commonjukebox/internal/config"
 	"github.com/danielhejduk/commonjukebox/internal/library"
 	"github.com/danielhejduk/commonjukebox/internal/tags"
+	"github.com/danielhejduk/commonjukebox/internal/check"
 )
 
 const usage = `Usage: jukebox <command> [flags]
@@ -22,6 +23,7 @@ Commands:
   list       List tracks in the library
   search     Search tracks by artist, album or title
   tag        Show or set tags (tag show | tag set)
+  check      Check tags for errors and duplicates
 
 Run "jukebox <command> -h" for command flags.
 `
@@ -33,6 +35,7 @@ var commands = map[string]command{
 	"list":   runList,
 	"search": runSearch,
 	"tag":    runTag,
+	"check":  runCheck,
 }
 
 func main() {
@@ -237,6 +240,41 @@ func runTag(args []string) error {
 		}
 	}
 	return errors.New("usage: jukebox tag show <file|dir>... | jukebox tag set [flags] <file|dir>...")
+}
+
+func runCheck(args []string) error {
+	fs, lib := newFlagSet("check")
+	cfg, err := parseWithConfig(fs, lib, args)
+	if err != nil {
+		return err
+	}
+	files, err := library.Scan(cfg.Library)
+	if err != nil {
+		return err
+	}
+
+	var tracks []tags.Track
+	var problems []check.Problem
+	for _, f := range files {
+		t, err := tags.Read(f)
+		if err != nil {
+			// tags.Read already prefixes the path; don't print it twice.
+			msg := strings.TrimPrefix(err.Error(), f+": ")
+			problems = append(problems, check.Problem{Path: f, Rule: "unreadable", Message: msg})
+			continue
+		}
+		tracks = append(tracks, t)
+	}
+	problems = append(problems, check.Check(tracks)...)
+
+	for _, p := range problems {
+		fmt.Println(p)
+	}
+	fmt.Printf("scanned %d tracks, %d errors\n", len(files), len(problems))
+	if len(problems) > 0 {
+		return fmt.Errorf("%d problems found", len(problems))
+	}
+	return nil
 }
 
 func runTagShow(paths []string) error {
