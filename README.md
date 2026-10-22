@@ -7,5 +7,5 @@ Features:
 - [X] Showing and setting tags
 - [X] Checking tags for errors and duplicates
 - [X] Adding new music
-- [ ] Re-encoding the music library
-- [ ] Rsync integration
+- [X] Re-encoding the music library
+- [ ] Syncing
