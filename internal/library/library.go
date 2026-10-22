@@ -13,7 +13,7 @@ func Scan(root string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && isAudio(path) {
+		if !d.IsDir() && IsAudio(path) {
 			files = append(files, path)
 		}
 		return nil
@@ -21,7 +21,8 @@ func Scan(root string) ([]string, error) {
 	return files, err
 }
 
-func isAudio(path string) bool {
+// IsAudio reports whether path has a supported audio extension, in any case.
+func IsAudio(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".flac", ".ogg", ".opus":
 		return true

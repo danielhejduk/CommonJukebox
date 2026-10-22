@@ -31,6 +31,8 @@ Commands:
   tag        Show or set tags (tag show | tag set)
   check      Check tags for errors and duplicates
   transcode  Encode a file with the configured codec
+  remote     Manage sync remotes (remote add | list | remove)
+  sync       Sync the library with a remote in both directions
 
 Run "jukebox <command> -h" for command flags.
 `
@@ -45,6 +47,8 @@ var commands = map[string]command{
 	"tag":       runTag,
 	"check":     runCheck,
 	"transcode": runTranscode,
+	"remote":    runRemote,
+	"sync":      runSync,
 }
 
 func main() {

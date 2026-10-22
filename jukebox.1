@@ -40,6 +40,30 @@ jukebox \- opinionated music library manager
 .IR path ]
 .I src dst
 .br
+.B jukebox remote add
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-insecure ]
+.I name url
+.br
+.B jukebox remote list
+.RB [ \-\-library
+.IR path ]
+.br
+.B jukebox remote remove
+.RB [ \-\-library
+.IR path ]
+.I name
+.br
+.B jukebox sync
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RB [ \-\-prefer
+.BR local | remote ]
+.RB [ \-\-force ]
+.I name
+.br
 .B jukebox tag show
 .IR path ...
 .br
@@ -307,6 +331,130 @@ The library is only read for its codec;
 and
 .I dst
 may be anywhere.
+.SS remote
+.B jukebox remote add
+.RB [ \-\-insecure ]
+.I name url
+.br
+.B jukebox remote list
+.br
+.B jukebox remote remove
+.I name
+.PP
+Manage the remotes that
+.B sync
+works with.
+They are stored in the library's settings file.
+.I name
+may contain letters, digits,
+.B \-
+and
+.BR _ .
+.I url
+is one of
+.PP
+.RS
+.EX
+ftp://\fR[\fIuser\fR@]\fIhost\fR[:\fIport\fR][/\fIdir\fR]
+ftps://\fR[\fIuser\fR@]\fIhost\fR[:\fIport\fR][/\fIdir\fR]
+sftp://\fIuser\fR@\fIhost\fR[:\fIport\fR][/\fIdir\fR]
+file://\fIdir\fR
+.EE
+.RE
+.PP
+.B ftps
+uses explicit TLS (AUTH TLS) on the normal FTP port.
+Without a user, the login is anonymous.
+Without a
+.IR dir ,
+the directory the server logs in to is used.
+.B sftp
+connects over SSH, by default on port 22.
+It logs in with the keys in the SSH agent, then the unencrypted keys
+.IR ~/.ssh/id_ed25519 ,
+.I id_ecdsa
+and
+.IR id_rsa ,
+and only then asks for a password, if the server allows one.
+The server's host key must already be in
+.IR ~/.ssh/known_hosts ;
+connect once with
+.BR ssh (1)
+to add it.
+.B file
+is a local directory, such as a mounted SD card.
+The URL may not contain a password, since the settings file travels with the
+library; see
+.BR ENVIRONMENT .
+.PP
+.B add
+replaces a remote of the same name.
+.B remove
+also deletes its sync snapshot, so a later remote of that name starts afresh.
+.TP
+.B \-\-insecure
+Do not verify the server's TLS certificate, for example one that is
+self-signed, or, for
+.BR sftp ,
+its SSH host key.
+.SS sync
+.B jukebox sync
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RB [ \-\-prefer
+.BR local | remote ]
+.RB [ \-\-force ]
+.I name
+.PP
+Make the library and the remote
+.I name
+hold the same tracks, in both directions.
+Only tracks are synced; other files and the
+.B .jukebox
+directory are left alone on both sides.
+Each action is printed as
+.BR push ,
+.BR pull ,
+.B delete local
+or
+.B delete remote
+followed by the track's path.
+.PP
+After each sync,
+.B sync
+records the size and modification time of every track on each side.
+The next sync compares each side with its own record:
+a track added or changed on one side is copied to the other,
+and a track deleted on one side is deleted on the other.
+The two sides' times are never compared with each other,
+so the clocks of the computer and the server need not agree.
+On the first sync nothing is deleted; tracks found on only one side are
+copied, and tracks on both sides with the same size are taken as the same.
+.PP
+A track that changed on both sides, or changed on one and was deleted on the
+other, is a conflict.
+Conflicts are printed on standard error and left alone, and the exit status
+is 1.
+.PP
+Copies are written under a temporary name and renamed when complete,
+so an interrupted sync never leaves a partial track.
+The record is saved as the sync goes, so running it again continues where it
+stopped.
+.TP
+.B \-\-dry\-run
+Print what would be done without changing anything.
+.TP
+.BR "\-\-prefer local" | remote
+Settle conflicts in favour of that side: its version is copied over the
+other, or, if it deleted the track, the track is deleted on the other side.
+.TP
+.B \-\-force
+Allow a sync that would delete more than 5 tracks and more than a tenth of
+the library on one side.
+Without it,
+.B sync
+refuses, since that usually means the remote is empty or not mounted.
 .SS "tag show"
 .B jukebox tag show
 .IR path ...
@@ -423,11 +571,14 @@ A leading
 .B ~
 is expanded.
 Accepted by
+.BR add ,
 .BR list ,
 .BR search ,
-.B check
+.BR check ,
+.BR transcode ,
+.B remote
 and
-.BR transcode .
+.BR sync .
 .TP
 .BR \-h ", " \-\-help
 Without a command, or as the command
@@ -448,32 +599,65 @@ the path of the library.
 .IB library /.jukebox/config
 The library's settings file.
 It is kept inside the library so the settings travel with it.
-Its only key is
+Its keys are
 .BR codec ,
 which is
 .BR flac ,
 .B opus
 or
-.BR vorbis ;
-when the file is missing,
-.B flac
-is used.
+.B vorbis
+.RB ( flac
+when unset), and, for each remote,
+.BI remote. name .url
+and
+.BI remote. name .insecure
+(\fBtrue\fR or unset), written by
+.BR "jukebox remote add" .
+.TP
+.IB library /.jukebox/sync/ name
+The record of the last sync with the remote
+.IR name .
+.TP
+.I ~/.ssh/known_hosts
+Host keys of SFTP servers.
+.TP
+.I ~/.netrc
+Passwords for FTP servers, in the usual
+.BR machine / login / password
+format.
 .PP
-Both files have one
+Both config files have one
 .IB key " = " value
 setting per line.
 Blank lines and lines starting with
 .B #
 are ignored, as are unknown keys.
+.SH ENVIRONMENT
+.TP
+.B JUKEBOX_PASSWORD
+The password for a remote whose URL has a user.
+For
+.BR sftp ,
+it is only used when SSH keys were not accepted.
+When it is not set,
+.B sync
+looks in
+.IR ~/.netrc ,
+then asks on the terminal.
+.TP
+.B XDG_CONFIG_HOME
+Where the config file is looked for.
 .SH EXIT STATUS
 .TP
 .B 0
 Success.
 .TP
 .B 1
-The command failed, or
+The command failed,
 .B check
-found problems.
+found problems, or
+.B sync
+skipped conflicts.
 .TP
 .B 2
 No command, an unknown command or an invalid flag.
@@ -520,5 +704,15 @@ Remove the genre from one track:
 .RS
 .EX
 jukebox tag set \-\-genre "" ~/Music/okc/01.flac
+.EE
+.RE
+.PP
+Sync the library with a phone running an FTP server, trying it out first:
+.PP
+.RS
+.EX
+jukebox remote add phone ftp://me@192.168.1.20:2121/Music
+jukebox sync \-\-dry\-run phone
+jukebox sync phone
 .EE
 .RE
