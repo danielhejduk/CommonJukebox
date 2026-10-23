@@ -22,25 +22,25 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-      runs-on: ${{ matrix.os }}
-      steps:
-        - uses: actions/checkout@v5
-        - uses: actions/setup-go@v6
-          with:
-            go-version-file: go.mod
-        - name: Install ffmpeg (Linux)
-          if: runner.os == 'Linux'
-          run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
-        - name: Install ffmpeg (macOS)
-          if: runner.os == 'macOS'
-          run: brew install ffmpeg
+      - name: Install ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
 
-        - name: Build
-          run: make jukebox
+      - name: Build
+        run: make jukebox
 
-        - name: Test
-          run: go test -race ./...
+      - name: Test
+        run: go test -race ./...
   lint:
     name: Lint
     runs-on: ubuntu-latest
