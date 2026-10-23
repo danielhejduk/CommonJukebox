@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      runs-on: ${{ matrix.os }}
+      steps:
+        - uses: actions/checkout@v5
+        - uses: actions/setup-go@v6
+          with:
+            go-version-file: go.mod
+        - name: Install ffmpeg (Linux)
+          if: runner.os == 'Linux'
+          run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+        - name: Install ffmpeg (macOS)
+          if: runner.os == 'macOS'
+          run: brew install ffmpeg
+
+        - name: Build
+          run: make jukebox
+
+        - name: Test
+          run: go test -race ./...
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
