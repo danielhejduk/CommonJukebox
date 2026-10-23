@@ -82,9 +82,27 @@ func newFlagSet(name string) (*flag.FlagSet, *string) {
 	return fs, lib
 }
 
+func parseArgs(fs *flag.FlagSet, args []string) {
+	var pos []string
+	for {
+		fs.Parse(args)
+		rest := fs.Args()
+		if n := len(args) - len(rest); n > 0 && args[n-1] == "--" {
+			pos = append(pos, rest...)
+			break
+		}
+		if len(rest) == 0 {
+			break
+		}
+		pos = append(pos, rest[0])
+		args = rest[1:]
+	}
+	fs.Parse(append([]string{"--"}, pos...))
+}
+
 // parseWithConfig parses the subcommand's flags and loads the config.
 func parseWithConfig(fs *flag.FlagSet, lib *string, args []string) (config.Config, error) {
-	fs.Parse(args)
+	parseArgs(fs, args)
 	return config.Load(*lib)
 }
 
@@ -94,7 +112,7 @@ func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	force := fs.Bool("force", false, "replace a library that is already set")
 	codec := fs.String("codec", "", "codec for the library: "+strings.Join(config.Codecs, ", ")+" (default "+config.DefaultSettings().Codec+")")
-	fs.Parse(args)
+	parseArgs(fs, args)
 	if fs.NArg() != 1 {
 		return errors.New("usage: jukebox init [--force] [--codec name] <dir>")
 	}
@@ -468,7 +486,7 @@ func runTagSet(args []string) error {
 	}
 	dryRun := fs.Bool("dry-run", false, "print what would change without writing")
 	force := fs.Bool("force", false, "allow --title or --track on more than one file")
-	fs.Parse(args)
+	parseArgs(fs, args)
 
 	// Only tag flags that were actually passed are changed.
 	changes := map[string]string{}
