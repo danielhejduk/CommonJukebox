@@ -137,7 +137,7 @@ func runList(args []string) error {
 	artist := fs.String("artist", "", "only tracks by this artist")
 	album := fs.String("album", "", "only tracks from this album")
 	genre := fs.String("genre", "", "only tracks in this genre")
-	stats := fs.Bool("stats", false, "shows library stats")
+	stats := fs.Bool("stats", false, "print a summary of the matching tracks instead of the tracks")
 	cfg, err := parseWithConfig(fs, lib, args)
 	if err != nil {
 		return err
