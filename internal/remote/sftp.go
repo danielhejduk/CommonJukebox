@@ -229,7 +229,7 @@ func (s *SFTP) Put(p string, r io.Reader, mtime time.Time) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	if _, err := f.ReadFrom(r); err != nil {
+	if _, err := f.ReadFromWithConcurrency(r, 0); err != nil {
 		_ = f.Close()
 		_ = s.c.Remove(tmp)
 		return Entry{}, err
