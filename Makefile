@@ -13,7 +13,7 @@ jukebox:
 
 install: jukebox
 	install -Dm755 jukebox $(DESTDIR)$(BINDIR)/jukebox
-	install -Dm644 jukebox.1 $(DESTDIR)$(MANDIR)/man1/jukebox.1
+	if [ -f jukebox.1 ]; then install -Dm644 jukebox.1 $(DESTDIR)$(MANDIR)/man1/jukebox.1; fi
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/jukebox
