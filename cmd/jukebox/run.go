@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"runtime"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/danielhejduk/commonjukebox/internal/add"
 	"github.com/danielhejduk/commonjukebox/internal/check"
@@ -135,21 +137,110 @@ func runList(args []string) error {
 	artist := fs.String("artist", "", "only tracks by this artist")
 	album := fs.String("album", "", "only tracks from this album")
 	genre := fs.String("genre", "", "only tracks in this genre")
+	stats := fs.Bool("stats", false, "shows library stats")
 	cfg, err := parseWithConfig(fs, lib, args)
 	if err != nil {
 		return err
 	}
-
 	tracks, err := loadTracks(cfg.Library)
 	if err != nil {
 		return err
 	}
+	var matched []tags.Track
 	for _, t := range tracks {
 		if matches(*artist, t.Artist) && matches(*album, t.Album) && matches(*genre, t.Genre) {
-			printTrack(t)
+			matched = append(matched, t)
 		}
 	}
+	if *stats {
+		printStats(matched)
+		return nil
+	}
+	for _, t := range matched {
+		printTrack(t)
+	}
 	return nil
+}
+
+// printStats summarizes tracks: totals, tracks per decade, the biggest
+// artists and genres, and tags worth fixing. An album is told apart by its
+// album artist (or artist) and title, like the sort order in list.
+func printStats(ts []tags.Track) {
+	albums := map[[2]string]bool{}
+	noArt := map[[2]string]bool{}
+	artists := map[string]int{}
+	genres := map[string]int{}
+	decades := map[string]int{}
+	noYear := 0
+	for _, t := range ts {
+		key := [2]string{cmp.Or(t.AlbumArtist, t.Artist), t.Album}
+		albums[key] = true
+		if t.Art == "" {
+			noArt[key] = true
+		}
+		artists[t.Artist]++
+		if t.Genre != "" {
+			genres[t.Genre]++
+		}
+		if y, err := strconv.Atoi(t.Year); err == nil && len(t.Year) == 4 {
+			decades[fmt.Sprintf("%ds", y/10*10)]++
+		} else {
+			noYear++
+		}
+	}
+
+	fmt.Printf("%d tracks, %d albums, %d artists, %d genres\n",
+		len(ts), len(albums), len(artists), len(genres))
+
+	if len(decades) > 0 {
+		fmt.Println("\nBy decade")
+		names := slices.Sorted(maps.Keys(decades))
+		printBars(names, decades)
+	}
+	if len(artists) > 0 {
+		fmt.Println("\nTop artists")
+		printBars(topKeys(artists, 10), artists)
+	}
+	if len(genres) > 0 {
+		fmt.Println("\nTop genres")
+		printBars(topKeys(genres, 10), genres)
+	}
+
+	if len(noArt) > 0 || noYear > 0 {
+		fmt.Println()
+		if len(noArt) > 0 {
+			fmt.Printf("%d albums without cover art\n", len(noArt))
+		}
+		if noYear > 0 {
+			fmt.Printf("%d tracks without a year\n", noYear)
+		}
+	}
+}
+
+// topKeys returns the n keys with the highest counts, ties broken by name.
+func topKeys(counts map[string]int, n int) []string {
+	keys := slices.Collect(maps.Keys(counts))
+	slices.SortFunc(keys, func(a, b string) int {
+		return cmp.Or(cmp.Compare(counts[b], counts[a]), cmp.Compare(a, b))
+	})
+	return keys[:min(n, len(keys))]
+}
+
+// printBars prints one line per key: the key, a bar scaled to the largest
+// count and the count.
+func printBars(keys []string, counts map[string]int) {
+	const width = 30
+	label, most := 0, 0
+	for _, k := range keys {
+		label = max(label, utf8.RuneCountInString(k))
+		most = max(most, counts[k])
+	}
+	for _, k := range keys {
+		n := counts[k]
+		bar := strings.Repeat("█", max(1, n*width/most))
+		pad := strings.Repeat(" ", label-utf8.RuneCountInString(k))
+		fmt.Printf("  %s%s  %-*s %d\n", k, pad, width, bar, n)
+	}
 }
 
 func runSearch(args []string) error {

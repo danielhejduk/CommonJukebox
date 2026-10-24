@@ -27,5 +27,8 @@ func Transcode(src, dst, codec string) error {
 	if err != nil {
 		return fmt.Errorf("%s: ffmpeg: %v: %s", src, err, bytes.TrimSpace(out))
 	}
+	if err := tags.CopyComments(src, dst); err != nil {
+		return err
+	}
 	return tags.CopyCover(src, dst)
 }

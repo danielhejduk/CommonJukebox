@@ -46,6 +46,17 @@ func Comments(path string) ([]string, error) {
 	return m.comments, nil
 }
 
+// CopyComments replaces the tags of dst with those of src, keeping dst's
+// pictures. ffmpeg joins a repeated key, such as several GENRE values, into
+// one "a;b" value; copying the comments afterwards keeps them separate.
+func CopyComments(src, dst string) error {
+	comments, err := Comments(src)
+	if err != nil {
+		return err
+	}
+	return modify(dst, func(m *meta) { m.comments = comments })
+}
+
 func readMeta(path string) (meta, error) {
 	f, err := os.Open(path)
 	if err != nil {

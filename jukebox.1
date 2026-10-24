@@ -25,6 +25,7 @@ jukebox \- opinionated music library manager
 .IR text ]
 .RB [ \-\-genre
 .IR text ]
+.RB [ \-\-stats ]
 .br
 .B jukebox search
 .RB [ \-\-library
@@ -241,6 +242,7 @@ Without it, an existing file is reported and left alone.
 .IR text ]
 .RB [ \-\-genre
 .IR text ]
+.RB [ \-\-stats ]
 .PP
 Print the tracks of the library, one per line, as
 .PP
@@ -261,6 +263,12 @@ keep only the tracks whose tag is exactly
 .IR text ,
 ignoring case.
 Several filters may be combined; a track must match all of them.
+.PP
+.B \-\-stats
+prints a summary of those tracks instead of the tracks themselves:
+how many tracks, albums, artists and genres there are,
+the tracks per decade, the ten biggest artists and genres,
+and how many albums lack cover art and tracks lack a year.
 .PP
 Files whose tags cannot be read are reported on standard error and skipped.
 .SS search

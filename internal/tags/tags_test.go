@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -66,6 +67,36 @@ func TestWrite(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestCopyComments(t *testing.T) {
+	multi := []string{"ARTIST=Kanye West", "ARTIST=Lil Baby", "GENRE=Rap", "GENRE=Hip-Hop", "GENRE=Experimental Hip-Hop"}
+	for _, name := range []string{"song.flac", "song.ogg", "song.opus"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			src, dst := filepath.Join(dir, "src"+filepath.Ext(name)), filepath.Join(dir, name)
+			data, _ := os.ReadFile("testdata/" + name)
+			os.WriteFile(src, data, 0o644)
+			os.WriteFile(dst, data, 0o644)
+			if err := modify(src, func(m *meta) { m.comments = multi }); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := CopyComments(src, dst); err != nil {
+				t.Fatal(err)
+			}
+			got, err := Comments(dst)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, multi) {
+				t.Errorf("got  %q\nwant %q", got, multi)
+			}
+			if filepath.Ext(name) != ".flac" {
+				checkOggPages(t, dst)
+			}
+		})
 	}
 }
 
