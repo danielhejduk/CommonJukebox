@@ -10,19 +10,24 @@ import (
 // A FLAC file is "fLaC" followed by metadata blocks, then the audio. Each block
 // has a 4-byte header: 1 bit "last block" flag, 7 bits type, 24 bits
 // big-endian length.
-const flacVorbisComment = 4
+const (
+	flacVorbisComment = 4
+	flacPicture       = 6
+)
 
-// readFLAC returns the comments from a FLAC file's VORBIS_COMMENT block.
-func readFLAC(r io.Reader) ([]string, error) {
+// readFLAC returns the comments from a FLAC file's VORBIS_COMMENT block and
+// the pictures from its PICTURE blocks.
+func readFLAC(r io.Reader) (meta, error) {
 	magic := make([]byte, 4)
 	if _, err := io.ReadFull(r, magic); err != nil || string(magic) != "fLaC" {
-		return nil, errors.New("not a FLAC file")
+		return meta{}, errors.New("not a FLAC file")
 	}
 
+	var m meta
 	for {
 		header := make([]byte, 4)
 		if _, err := io.ReadFull(r, header); err != nil {
-			return nil, err
+			return meta{}, err
 		}
 		last := header[0]&0x80 != 0
 		kind := header[0] & 0x7f
@@ -30,21 +35,30 @@ func readFLAC(r io.Reader) ([]string, error) {
 
 		block := make([]byte, length)
 		if _, err := io.ReadFull(r, block); err != nil {
-			return nil, err
+			return meta{}, err
 		}
-		if kind == flacVorbisComment {
+		switch kind {
+		case flacVorbisComment:
 			_, comments, err := parseComments(block)
-			return comments, err
+			if err != nil {
+				return meta{}, err
+			}
+			m.comments = comments
+		case flacPicture:
+			if p, err := parsePicture(block); err == nil {
+				m.pictures = append(m.pictures, p)
+			}
 		}
 		if last {
-			return nil, nil // no tags
+			return m, nil
 		}
 	}
 }
 
-// writeFLAC returns a copy of a FLAC file with its comments replaced by
-// update(comments). If the file has no comment block, one is added.
-func writeFLAC(data []byte, update func([]string) []string) ([]byte, error) {
+// writeFLAC returns a copy of a FLAC file with its comments and pictures
+// changed by update. If the file has no comment block, one is added; the
+// pictures follow it.
+func writeFLAC(data []byte, update func(*meta)) ([]byte, error) {
 	if !bytes.HasPrefix(data, []byte("fLaC")) {
 		return nil, errors.New("not a FLAC file")
 	}
@@ -73,11 +87,24 @@ func writeFLAC(data []byte, update func([]string) []string) ([]byte, error) {
 	}
 	audio := data[pos:]
 
+	// Pictures that can't be parsed are kept as they are.
+	var m meta
+	blocks = slices.DeleteFunc(blocks, func(b block) bool {
+		if b.kind != flacPicture {
+			return false
+		}
+		p, err := parsePicture(b.data)
+		if err == nil {
+			m.pictures = append(m.pictures, p)
+		}
+		return err == nil
+	})
+
 	i := slices.IndexFunc(blocks, func(b block) bool { return b.kind == flacVorbisComment })
-	vendor, comments := "CommonJukebox", []string(nil)
+	vendor := "CommonJukebox"
 	if i >= 0 {
 		var err error
-		if vendor, comments, err = parseComments(blocks[i].data); err != nil {
+		if vendor, m.comments, err = parseComments(blocks[i].data); err != nil {
 			return nil, err
 		}
 	} else {
@@ -85,9 +112,17 @@ func writeFLAC(data []byte, update func([]string) []string) ([]byte, error) {
 		i = 1
 		blocks = slices.Insert(blocks, i, block{kind: flacVorbisComment})
 	}
-	blocks[i].data = encodeComments(vendor, update(comments))
+	update(&m)
+	blocks[i].data = encodeComments(vendor, m.comments)
 	if len(blocks[i].data) >= 1<<24 {
 		return nil, errors.New("tags too large")
+	}
+	for j, p := range m.pictures {
+		b := block{flacPicture, encodePicture(p)}
+		if len(b.data) >= 1<<24 {
+			return nil, errors.New("picture too large")
+		}
+		blocks = slices.Insert(blocks, i+1+j, b)
 	}
 
 	var out bytes.Buffer

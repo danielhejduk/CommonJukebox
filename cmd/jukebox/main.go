@@ -378,9 +378,11 @@ func runTag(args []string) error {
 			return runTagShow(args[1:])
 		case "set":
 			return runTagSet(args[1:])
+		case "art":
+			return runTagArt(args[1:])
 		}
 	}
-	return errors.New("usage: jukebox tag show <file|dir>... | jukebox tag set [flags] <file|dir>...")
+	return errors.New("usage: jukebox tag show <file|dir>... | jukebox tag set [flags] <file|dir>... | jukebox tag art <show|set|extract|remove> ...")
 }
 
 func runCheck(args []string) error {

@@ -89,24 +89,30 @@ func commentPrefix(packet []byte) []byte {
 	return []byte("\x03vorbis")
 }
 
-// readOgg returns the comments from an Ogg Opus or Ogg Vorbis file.
-func readOgg(r io.Reader) ([]string, error) {
+// readOgg returns the comments and pictures from an Ogg Opus or Ogg Vorbis
+// file.
+func readOgg(r io.Reader) (meta, error) {
 	_, packets, err := readHeaders(r)
 	if err != nil {
-		return nil, err
+		return meta{}, err
 	}
 	prefix := commentPrefix(packets[1])
 	if !bytes.HasPrefix(packets[1], prefix) {
-		return nil, errors.New("missing comment header")
+		return meta{}, errors.New("missing comment header")
 	}
 	_, comments, err := parseComments(packets[1][len(prefix):])
-	return comments, err
+	if err != nil {
+		return meta{}, err
+	}
+	var m meta
+	m.comments, m.pictures = splitPictures(comments)
+	return m, nil
 }
 
-// writeOgg returns a copy of an Ogg file with its comments replaced by
-// update(comments). The header pages after the first are rebuilt; if their
+// writeOgg returns a copy of an Ogg file with its comments and pictures
+// changed by update. The header pages after the first are rebuilt; if their
 // count changes, the following pages are renumbered.
-func writeOgg(data []byte, update func([]string) []string) ([]byte, error) {
+func writeOgg(data []byte, update func(*meta)) ([]byte, error) {
 	r := bytes.NewReader(data)
 	pages, packets, err := readHeaders(r)
 	if err != nil {
@@ -124,7 +130,10 @@ func writeOgg(data []byte, update func([]string) []string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	comment := append(prefix, encodeComments(vendor, update(comments))...)
+	var m meta
+	m.comments, m.pictures = splitPictures(comments)
+	update(&m)
+	comment := append(prefix, encodeComments(vendor, joinPictures(m.comments, m.pictures))...)
 	if string(prefix) == "\x03vorbis" {
 		comment = append(comment, 1) // Vorbis framing bit
 	}

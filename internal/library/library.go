@@ -2,6 +2,7 @@ package library
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -28,4 +29,30 @@ func IsAudio(path string) bool {
 		return true
 	}
 	return false
+}
+
+// CoverName returns the name of an album's cover file holding an image with
+// file extension ext, such as ".jpg".
+func CoverName(ext string) string {
+	return "cover" + ext
+}
+
+// Covers returns the cover files in dir: cover.jpg, cover.jpeg or cover.png,
+// in any case.
+func Covers(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var covers []string
+	for _, e := range entries {
+		name := strings.ToLower(e.Name())
+		switch name {
+		case "cover.jpg", "cover.jpeg", "cover.png":
+			if e.Type().IsRegular() {
+				covers = append(covers, filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	return covers, nil
 }

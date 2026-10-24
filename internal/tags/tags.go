@@ -24,39 +24,57 @@ type Track struct {
 	Track       int    // 0 if missing or not a number
 	Year        string // first 4 characters of DATE
 	Lyrics      string
+	Art         string // Sum of the front cover, empty if there is none
+}
+
+// meta is what a file holds besides its audio: Vorbis comments, without any
+// pictures, and the embedded pictures.
+type meta struct {
+	comments []string
+	pictures []Picture
 }
 
 var errUnsupported = errors.New("unsupported file type")
 
 // Comments returns the raw "KEY=value" tags of a .flac, .ogg or .opus file.
+// Embedded pictures are left out.
 func Comments(path string) ([]string, error) {
-	f, err := os.Open(path)
+	m, err := readMeta(path)
 	if err != nil {
 		return nil, err
 	}
+	return m.comments, nil
+}
+
+func readMeta(path string) (meta, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return meta{}, err
+	}
 	defer f.Close()
 
-	var comments []string
+	var m meta
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".flac":
-		comments, err = readFLAC(f)
+		m, err = readFLAC(f)
 	case ".ogg", ".opus":
-		comments, err = readOgg(f)
+		m, err = readOgg(f)
 	default:
 		err = errUnsupported
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return meta{}, fmt.Errorf("%s: %w", path, err)
 	}
-	return comments, nil
+	return m, nil
 }
 
 // Read reads the tags of a .flac, .ogg or .opus file.
 func Read(path string) (Track, error) {
-	comments, err := Comments(path)
+	m, err := readMeta(path)
 	if err != nil {
 		return Track{}, err
 	}
+	comments := m.comments
 
 	// Keys are case-insensitive; the first value of a key wins.
 	tags := map[string]string{}
@@ -75,6 +93,11 @@ func Read(path string) (Track, error) {
 		return n
 	}
 
+	art := ""
+	if p := frontCover(m.pictures); p != nil {
+		art = Sum(p.Data)
+	}
+
 	year := tags["DATE"]
 	if len(year) > 4 {
 		year = year[:4]
@@ -91,6 +114,7 @@ func Read(path string) (Track, error) {
 		Track:       number("TRACKNUMBER"),
 		Year:        year,
 		Lyrics:      tags["LYRICS"],
+		Art:         art,
 	}, nil
 }
 
@@ -100,12 +124,17 @@ func Read(path string) (Track, error) {
 // The new file is written next to the original and renamed over it, so a
 // crash never leaves a half-written track.
 func Write(path string, changes map[string]string) error {
+	return modify(path, func(m *meta) { m.comments = applyChanges(m.comments, changes) })
+}
+
+// modify rewrites a file with its meta changed by update, atomically like
+// Write.
+func modify(path string, update func(*meta)) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	update := func(comments []string) []string { return applyChanges(comments, changes) }
 	var out []byte
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".flac":
