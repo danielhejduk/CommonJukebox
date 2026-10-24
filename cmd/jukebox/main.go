@@ -9,10 +9,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/danielhejduk/commonjukebox/internal/add"
 	"github.com/danielhejduk/commonjukebox/internal/check"
@@ -328,6 +330,22 @@ func loadTracks(root string) ([]tags.Track, error) {
 	return tracks, nil
 }
 
+func readTracks(files []string) (tracks []tags.Track, errs []error) {
+	tracks = make([]tags.Track, len(files))
+	errs = make([]error, len(files))
+	sem := make(chan struct{}, 2*runtime.GOMAXPROCS(0))
+	var wg sync.WaitGroup
+	for i, f := range files {
+		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			tracks[i], errs[i] = tags.Read(f)
+		})
+	}
+	wg.Wait()
+	return tracks, errs
+}
+
 // compareTracks orders tracks by album artist (falling back to artist, so a
 // compilation stays together), album, disc and track number. Text is compared
 // ignoring case.
@@ -395,18 +413,17 @@ func runCheck(args []string) error {
 	if err != nil {
 		return err
 	}
-
+	read, errs := readTracks(files)
 	var tracks []tags.Track
 	var problems []check.Problem
-	for _, f := range files {
-		t, err := tags.Read(f)
-		if err != nil {
+	for i, f := range files {
+		if errs[i] != nil {
 			// tags.Read already prefixes the path; don't print it twice.
-			msg := strings.TrimPrefix(err.Error(), f+": ")
+			msg := strings.TrimPrefix(errs[i].Error(), f+": ")
 			problems = append(problems, check.Problem{Path: f, Rule: "unreadable", Message: msg})
 			continue
 		}
-		tracks = append(tracks, t)
+		tracks = append(tracks, read[i])
 	}
 	problems = append(problems, check.Check(tracks)...)
 
