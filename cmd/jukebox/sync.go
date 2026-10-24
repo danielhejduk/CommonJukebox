@@ -1,19 +1,18 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"slices"
-	"strings"
 
 	"github.com/danielhejduk/commonjukebox/internal/config"
 	"github.com/danielhejduk/commonjukebox/internal/remote"
 	jsync "github.com/danielhejduk/commonjukebox/internal/sync"
+	"golang.org/x/term"
 )
 
 func runRemote(args []string) error {
@@ -198,24 +197,38 @@ func runSync(args []string) error {
 // passwordPrompter asks on the terminal without echoing, or returns nil when
 // stdin isn't a terminal.
 func passwordPrompter() func(string) (string, error) {
-	info, err := os.Stdin.Stat()
-	if err != nil || info.Mode()&os.ModeCharDevice == 0 {
+	fd := int(os.Stdin.Fd())
+	if !term.IsTerminal(fd) {
 		return nil
 	}
 	return func(question string) (string, error) {
-		fmt.Fprintf(os.Stderr, "%s: ", question)
-		if stty("-echo") == nil {
-			defer stty("echo")
-		}
-		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		fmt.Fprintln(os.Stderr)
-		if errors.Is(err, io.EOF) && line == "" {
-			return "", errors.New("no password given: set JUKEBOX_PASSWORD or add it to ~/.netrc")
-		}
-		if err != nil && !errors.Is(err, io.EOF) {
+		state, err := term.GetState(fd)
+		if err != nil {
 			return "", err
 		}
-		return strings.TrimRight(line, "\r\n"), nil
+		sig := make(chan os.Signal, 1)
+		done := make(chan struct{})
+		signal.Notify(sig, os.Interrupt)
+		defer func() { signal.Stop(sig); close(done) }()
+		go func() {
+			select {
+			case <-sig:
+				_ = term.Restore(fd, state)
+				fmt.Fprintln(os.Stderr)
+				os.Exit(130)
+			case <-done:
+			}
+		}()
+		fmt.Fprintf(os.Stderr, "%s: ", question)
+		b, err := term.ReadPassword(fd)
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return "", err
+		}
+		if len(b) == 0 {
+			return "", errors.New("no password given")
+		}
+		return string(b), nil
 	}
 }
 

@@ -7,6 +7,7 @@ require (
 	github.com/pkg/sftp v1.13.11
 	goftp.io/server/v2 v2.0.3
 	golang.org/x/crypto v0.58.0
+	golang.org/x/term v0.47.0
 )
 
 require (
