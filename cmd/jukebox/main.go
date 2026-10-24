@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,6 +40,18 @@ Run "jukebox <command> -h" for command flags.
 
 type command func(args []string) error
 
+var version = ""
+
+func versionString() string {
+	if version != "" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" {
+		return info.Main.Version
+	}
+	return "devel"
+}
+
 var commands = map[string]command{
 	"init":      runInit,
 	"add":       runAdd,
@@ -49,6 +62,7 @@ var commands = map[string]command{
 	"transcode": runTranscode,
 	"remote":    runRemote,
 	"sync":      runSync,
+	"version":   runVersion,
 }
 
 func main() {
@@ -414,6 +428,11 @@ func runTranscode(args []string) error {
 		return errors.New("usage: jukebox transcode [--library path] <src> <dst>")
 	}
 	return transcode.Transcode(fs.Arg(0), fs.Arg(1), cfg.Settings.Codec)
+}
+
+func runVersion(args []string) error {
+	fmt.Println("CommonJukebox", versionString())
+	return nil
 }
 
 func runTagShow(paths []string) error {
