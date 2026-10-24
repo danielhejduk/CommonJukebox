@@ -3,14 +3,12 @@
 package add
 
 import (
-	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -20,6 +18,7 @@ import (
 	"github.com/danielhejduk/commonjukebox/internal/config"
 	"github.com/danielhejduk/commonjukebox/internal/library"
 	"github.com/danielhejduk/commonjukebox/internal/tags"
+	"github.com/danielhejduk/commonjukebox/internal/transcode"
 )
 
 type Item struct {
@@ -308,7 +307,7 @@ func Execute(it Item, force bool) error {
 	if it.Transcode {
 		err = tmp.Close()
 		if err == nil {
-			err = transcode(it.Src, tmp.Name(), it.Codec)
+			err = transcode.Transcode(it.Src, tmp.Name(), it.Codec)
 		}
 	} else {
 		err = copyFile(tmp, it.Src)
@@ -356,14 +355,4 @@ func copyFile(dst *os.File, src string) error {
 		return err
 	}
 	return dst.Close()
-}
-
-func transcode(src, dst, codec string) error {
-	args := []string{"-nostdin", "-loglevel", "error", "-y", "-i", src, "-map", "0:a", "-map_metadata", "0"}
-	args = append(append(args, ffmpegArgs[codec]...), dst)
-	out, err := exec.Command("ffmpeg", args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s: ffmpeg: %v: %s", src, err, bytes.TrimSpace(out))
-	}
-	return nil
 }
