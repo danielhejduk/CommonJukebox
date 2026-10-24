@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+
+	"github.com/danielhejduk/commonjukebox/internal/tags"
 )
 
 var ffmpegArgs = map[string][]string{
@@ -25,5 +27,5 @@ func Transcode(src, dst, codec string) error {
 	if err != nil {
 		return fmt.Errorf("%s: ffmpeg: %v: %s", src, err, bytes.TrimSpace(out))
 	}
-	return nil
+	return tags.CopyCover(src, dst)
 }
