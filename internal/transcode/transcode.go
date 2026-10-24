@@ -19,7 +19,7 @@ func Transcode(src, dst, codec string) error {
 	if !ok {
 		return fmt.Errorf("unsupported codec %q", codec)
 	}
-	args := []string{"-nostdin", "-loglevel", "error", "-y", "-i", src, "-map", "0:a", "-map_metadata", "0"}
+	args := []string{"-nostdin", "-loglevel", "error", "-y", "-i", src, "-map", "0:a", "-map_metadata", "0", "-map_metadata", "0:s:a:0"}
 	args = append(append(args, codecArgs...), dst)
 	out, err := exec.Command("ffmpeg", args...).CombinedOutput()
 	if err != nil {
