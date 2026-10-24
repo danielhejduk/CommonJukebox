@@ -2,6 +2,8 @@
 An opinionated music library manager for FLAC, Ogg Vorbis and Opus files.
 Written in Go.
 
+`init` -> `add` -> `check` -> `sync`
+
 Features:
 - [X] Listing tracks in a music library
 - [X] Searching in a music library
