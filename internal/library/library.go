@@ -24,6 +24,10 @@ func Scan(root string) ([]string, error) {
 
 // IsAudio reports whether path has a supported audio extension, in any case.
 func IsAudio(path string) bool {
+	// Hidden MacOS metadata files
+	if strings.HasPrefix(filepath.Base(path), ".") {
+		return false
+	}
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".flac", ".ogg", ".opus":
 		return true
