@@ -230,12 +230,6 @@ func extFor(codec string) string {
 	return ".ogg"
 }
 
-var ffmpegArgs = map[string][]string{
-	"flac":   {"-c:a", "flac", "-compression_level", "8"},
-	"opus":   {"-c:a", "libopus", "-b:a", "160k", "-vbr", "on"},
-	"vorbis": {"-c:a", "libvorbis", "-q:a", "6"},
-}
-
 func Validate(items []Item) []check.Problem {
 	incoming := map[string]bool{}
 	dirs := map[string]bool{}

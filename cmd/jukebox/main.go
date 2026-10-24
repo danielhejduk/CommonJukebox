@@ -128,7 +128,7 @@ func runInit(args []string) error {
 	codec := fs.String("codec", "", "codec for the library: "+strings.Join(config.Codecs, ", ")+" (default "+config.DefaultSettings().Codec+")")
 	parseArgs(fs, args)
 	if fs.NArg() != 1 {
-		return errors.New("usage: jukebox init [--force] [--codec name] <dir>")
+		return usageError("usage: jukebox init [--force] [--codec name] <dir>")
 	}
 
 	lib, err := config.AbsPath(fs.Arg(0))
@@ -176,7 +176,7 @@ func runAdd(args []string) error {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return errors.New("usage: jukebox add [--library path] [--dry-run] [--force] <file|dir>...")
+		return usageError("usage: jukebox add [--library path] [--dry-run] [--force] <file|dir>...")
 	}
 
 	files, errs := collectFiles(fs.Args())
@@ -291,7 +291,7 @@ func runSearch(args []string) error {
 	}
 	query := strings.ToLower(strings.Join(fs.Args(), " "))
 	if query == "" {
-		return errors.New("usage: jukebox search [--library path] <text>")
+		return usageError("usage: jukebox search [--library path] <text>")
 	}
 
 	tracks, err := loadTracks(cfg.Library)
@@ -382,7 +382,7 @@ func runTag(args []string) error {
 			return runTagArt(args[1:])
 		}
 	}
-	return errors.New("usage: jukebox tag show <file|dir>... | jukebox tag set [flags] <file|dir>... | jukebox tag art <show|set|extract|remove> ...")
+	return usageError("usage: jukebox tag show <file|dir>... | jukebox tag set [flags] <file|dir>... | jukebox tag art <show|set|extract|remove> ...")
 }
 
 func runCheck(args []string) error {
@@ -427,7 +427,7 @@ func runTranscode(args []string) error {
 		return err
 	}
 	if fs.NArg() != 2 {
-		return errors.New("usage: jukebox transcode [--library path] <src> <dst>")
+		return usageError("usage: jukebox transcode [--library path] <src> <dst>")
 	}
 	return transcode.Transcode(fs.Arg(0), fs.Arg(1), cfg.Settings.Codec)
 }
@@ -439,7 +439,7 @@ func runVersion(args []string) error {
 
 func runTagShow(paths []string) error {
 	if len(paths) == 0 {
-		return errors.New("usage: jukebox tag show <file|dir>...")
+		return usageError("usage: jukebox tag show <file|dir>...")
 	}
 	return forEachFile(paths, func(file string) error {
 		t, err := tags.Read(file)
@@ -521,7 +521,7 @@ func runTagSet(args []string) error {
 		}
 	})
 	if len(changes) == 0 || fs.NArg() == 0 {
-		return errors.New("usage: jukebox tag set [--dry-run] [--force] [--artist X] [--album X] [--title X] [--genre X] [--track N] [--year N] <file|dir>...")
+		return usageError("usage: jukebox tag set [--dry-run] [--force] [--artist X] [--album X] [--title X] [--genre X] [--track N] [--year N] <file|dir>...")
 	}
 
 	files, errs := collectFiles(fs.Args())
@@ -591,4 +591,9 @@ func joinErrors(errs []error) error {
 		return errs[0]
 	}
 	return fmt.Errorf("%d errors:\n%w", len(errs), errors.Join(errs...))
+}
+
+// usageError wraps a usage message; these intentionally end in "..." so ST1005 does not apply.
+func usageError(msg string) error {
+	return errors.New(msg)
 }

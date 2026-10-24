@@ -67,3 +67,27 @@ jobs:
 
       - name: staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+  goreleaser:
+    name: GoReleaser
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Tag pushes publish a GitHub release; everything else does a snapshot
+      # build to make sure the release config keeps working.
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean ${{ !startsWith(github.ref, 'refs/tags/') && '--snapshot' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

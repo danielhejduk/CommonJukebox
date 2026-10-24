@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"cmp"
-	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -33,12 +32,12 @@ func runTagArt(args []string) error {
 			return runArtRemove(args[1:])
 		}
 	}
-	return errors.New(artUsage)
+	return usageError(artUsage)
 }
 
 func runArtShow(paths []string) error {
 	if len(paths) == 0 {
-		return errors.New("usage: jukebox tag art show <file|dir>...")
+		return usageError("usage: jukebox tag art show <file|dir>...")
 	}
 	return forEachFile(paths, func(file string) error {
 		p, err := tags.Cover(file)
@@ -56,7 +55,7 @@ func runArtSet(args []string) error {
 	force := fs.Bool("force", false, "replace existing covers and allow a directory holding several albums")
 	parseArgs(fs, args)
 	if fs.NArg() < 2 {
-		return errors.New("usage: jukebox tag art set [--dry-run] [--force] <image> <file|dir>...")
+		return usageError("usage: jukebox tag art set [--dry-run] [--force] <image> <file|dir>...")
 	}
 
 	image := fs.Arg(0)
@@ -135,7 +134,7 @@ func runArtExtract(args []string) error {
 	force := fs.Bool("force", false, "replace an existing file")
 	parseArgs(fs, args)
 	if fs.NArg() != 1 && fs.NArg() != 2 {
-		return errors.New("usage: jukebox tag art extract [--force] <file> [out]")
+		return usageError("usage: jukebox tag art extract [--force] <file> [out]")
 	}
 
 	file := fs.Arg(0)
@@ -175,7 +174,7 @@ func runArtRemove(args []string) error {
 	dryRun := fs.Bool("dry-run", false, "print what would change without writing")
 	parseArgs(fs, args)
 	if fs.NArg() == 0 {
-		return errors.New("usage: jukebox tag art remove [--dry-run] <file|dir>...")
+		return usageError("usage: jukebox tag art remove [--dry-run] <file|dir>...")
 	}
 
 	t, errs := findArtTargets(fs.Args())

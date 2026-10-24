@@ -35,10 +35,6 @@ func NewSnapshot() Snapshot {
 	return Snapshot{Local: map[string]State{}, Remote: map[string]State{}}
 }
 
-func (s Snapshot) empty() bool {
-	return len(s.Local) == 0 && len(s.Remote) == 0
-}
-
 // SnapshotPath returns where the snapshot for the named remote is stored.
 func SnapshotPath(root, name string) string {
 	return filepath.Join(root, ".jukebox", "sync", name)
