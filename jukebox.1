@@ -1,5 +1,5 @@
 '\" t
-.TH JUKEBOX 1 2026-10-21 "commonjukebox 0.1" "User Commands"
+.TH JUKEBOX 1 2026-10-24 "commonjukebox 0.1" "User Commands"
 .SH NAME
 jukebox \- opinionated music library manager
 .SH SYNOPSIS
@@ -69,6 +69,24 @@ jukebox \- opinionated music library manager
 .br
 .B jukebox tag set
 .RI [ flags ]
+.IR path ...
+.br
+.B jukebox tag art show
+.IR path ...
+.br
+.B jukebox tag art set
+.RB [ \-\-dry\-run ]
+.RB [ \-\-force ]
+.I image
+.IR path ...
+.br
+.B jukebox tag art extract
+.RB [ \-\-force ]
+.I file
+.RI [ out ]
+.br
+.B jukebox tag art remove
+.RB [ \-\-dry\-run ]
 .IR path ...
 .br
 .B jukebox
@@ -527,13 +545,118 @@ or
 when the paths hold more than one track.
 Without it the command is refused, since every track would get the same
 title or number, which is almost always a mistake.
+.SS "tag art"
+.B jukebox tag art show
+.IR path ...
+.br
+.B jukebox tag art set
+.RB [ \-\-dry\-run ]
+.RB [ \-\-force ]
+.I image
+.IR path ...
+.br
+.B jukebox tag art extract
+.RB [ \-\-force ]
+.I file
+.RI [ out ]
+.br
+.B jukebox tag art remove
+.RB [ \-\-dry\-run ]
+.IR path ...
+.PP
+Manage cover art: the front cover embedded in each track, and the cover file
+of an album, named
+.BR cover.jpg ,
+.B cover.jpeg
+or
+.B cover.png
+(in any case) and kept in the album's directory.
+A track with no picture marked as a front cover uses a picture of type
+\(lqother\(rq instead, which is how
+.BR ffmpeg (1)
+embeds covers.
+Other embedded pictures are always kept.
+.PP
+The cover file only goes with the tracks of a directory given as a
+.IR path :
+naming single tracks never touches the cover file their album shares.
+Files are rewritten the same way as by
+.BR "tag set" ,
+and every file written or removed is printed.
+.TP
+.B show
+For every track among the given files and directories, print its path and
+its front cover's format, size in pixels and size in bytes, or
+.BR none .
+.TP
+.B set
+Embed the JPEG or PNG
+.I image
+as the front cover of every track among the paths, and make it the cover file
+of each directory holding them, named
+.B cover.jpg
+or
+.BR cover.png ;
+other cover files there are removed.
+A warning is printed when
+.I image
+is larger than 1 MB, since every track grows by its size.
+Tracks and cover files that already hold the image are left alone.
+Nothing is changed if any track already has a different front cover, a
+directory already has a different cover file, or a directory
+.I path
+holds the tracks of more than one album directory.
+.RS
+.TP
+.B \-\-dry\-run
+Print what would change, but do not change it.
+.TP
+.B \-\-force
+Replace existing front covers and cover files, and allow a directory holding
+several albums, which all get the same cover.
+.RE
+.TP
+.B extract
+Write the front cover of the track
+.I file
+to
+.IR out .
+When
+.I out
+is a directory or is not given (meaning the directory of
+.IR file ),
+the cover is written there as
+.B cover.jpg
+or
+.BR cover.png .
+It is an error if
+.I file
+has no front cover.
+.RS
+.TP
+.B \-\-force
+Replace
+.I out
+if it exists and holds a different image.
+.RE
+.TP
+.B remove
+Remove the front cover of every track among the paths, and the cover files of
+each directory holding them.
+.RS
+.TP
+.B \-\-dry\-run
+Print what would change, but do not change it.
+.RE
 .SS "Paths and errors in tag"
 A
 .I path
 given to
-.B tag show
+.BR "tag show" ,
+.BR "tag set" ,
+.B "tag art show"
 or
-.B tag set
+.B "tag art remove"
 may be a track or a directory, which is searched the same way as the library.
 A path that cannot be read or holds no tracks is an error.
 An error on one file does not stop the others:
@@ -696,6 +819,15 @@ Tag a downloaded album, trying it out first, and look at the result:
 jukebox tag set \-\-dry\-run \-\-artist Radiohead \-\-year 1997 ~/Downloads/okc
 jukebox tag set \-\-artist Radiohead \-\-year 1997 ~/Downloads/okc
 jukebox tag show ~/Downloads/okc
+.EE
+.RE
+.PP
+Give the album a cover, then check it:
+.PP
+.RS
+.EX
+jukebox tag art set ~/Downloads/folder.jpg ~/Downloads/okc
+jukebox tag art show ~/Downloads/okc
 .EE
 .RE
 .PP
