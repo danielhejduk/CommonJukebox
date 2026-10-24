@@ -9,8 +9,8 @@ import (
 	"slices"
 
 	"github.com/danielhejduk/commonjukebox/internal/config"
+	jsync "github.com/danielhejduk/commonjukebox/internal/mirror"
 	"github.com/danielhejduk/commonjukebox/internal/remote"
-	jsync "github.com/danielhejduk/commonjukebox/internal/sync"
 	"golang.org/x/term"
 )
 
