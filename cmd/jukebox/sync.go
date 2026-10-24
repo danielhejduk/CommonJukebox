@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"slices"
 
@@ -232,8 +231,10 @@ func passwordPrompter() func(string) (string, error) {
 	}
 }
 
+/*
 func stty(arg string) error {
 	cmd := exec.Command("stty", arg)
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
 }
+*/
