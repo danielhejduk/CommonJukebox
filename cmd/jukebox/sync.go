@@ -230,11 +230,3 @@ func passwordPrompter() func(string) (string, error) {
 		return string(b), nil
 	}
 }
-
-/*
-func stty(arg string) error {
-	cmd := exec.Command("stty", arg)
-	cmd.Stdin = os.Stdin
-	return cmd.Run()
-}
-*/
