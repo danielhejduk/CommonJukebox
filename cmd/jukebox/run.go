@@ -69,7 +69,8 @@ func runInit(args []string) error {
 }
 
 // runAdd copies files into the library, converting lossless ones to the
-// library's codec and asking for tags the destination path needs.
+// library's codec and asking for tags the destination path needs. It is the
+// only command that takes WAV files.
 func runAdd(args []string) error {
 	fs, lib := newFlagSet("add")
 	dryRun := fs.Bool("dry-run", false, "print where files would go without copying or asking")
@@ -82,7 +83,7 @@ func runAdd(args []string) error {
 		return usageError("usage: jukebox add [--library path] [--dry-run] [--force] <file|dir>...")
 	}
 
-	files, errs := collectFiles(fs.Args())
+	files, errs := collectFiles(library.ScanSources, fs.Args())
 	var ask add.Prompter
 	if !*dryRun {
 		ask = stdinPrompter()
@@ -499,7 +500,7 @@ func runTagSet(args []string) error {
 		return usageError("usage: jukebox tag set [--dry-run] [--force] [--artist X] [--album X] [--title X] [--genre X] [--track N] [--year N] <file|dir>...")
 	}
 
-	files, errs := collectFiles(fs.Args())
+	files, errs := collectFiles(library.Scan, fs.Args())
 	if len(perTrack) > 0 && len(files) > 1 && !*force {
 		return fmt.Errorf("%s would give %d files the same value; pass --force if you mean it", strings.Join(perTrack, " and "), len(files))
 	}
@@ -521,18 +522,18 @@ func runTagSet(args []string) error {
 // forEachFile calls fn for every audio file in paths; directories are searched.
 // It keeps going after errors and returns all of them at the end.
 func forEachFile(paths []string, fn func(file string) error) error {
-	files, errs := collectFiles(paths)
+	files, errs := collectFiles(library.Scan, paths)
 	errs = append(errs, eachFile(files, fn)...)
 	return joinErrors(errs)
 }
 
-// collectFiles returns every audio file in paths, plus an error for each path
-// that can't be scanned or holds no audio files.
-func collectFiles(paths []string) ([]string, []error) {
+// collectFiles returns every audio file that scan finds in paths, plus an
+// error for each path that can't be scanned or holds no audio files.
+func collectFiles(scan func(root string) ([]string, error), paths []string) ([]string, []error) {
 	var files []string
 	var errs []error
 	for _, p := range paths {
-		found, err := library.Scan(p)
+		found, err := scan(p)
 		if err != nil {
 			errs = append(errs, err)
 			continue

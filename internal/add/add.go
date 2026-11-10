@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -110,11 +111,17 @@ func planAlbum(root, codec, dir string, tracks []tags.Track, ask Prompter) (item
 
 		for i := range items {
 			it := &items[i]
+			// Untagged files, WAV rips above all, are often named after the track.
+			guessedTrack, guessedTitle := guessFromName(it.Src)
+			trackDef := ""
+			if guessedTrack > 0 {
+				trackDef = strconv.Itoa(guessedTrack)
+			}
 			for _, f := range trackFields {
 				if sanitize(*f.value(&it.Track)) != "" {
 					continue
 				}
-				def := ""
+				def := guessedTitle
 				if f.key == "ARTIST" {
 					def = it.Track.AlbumArtist
 				}
@@ -125,7 +132,7 @@ func planAlbum(root, codec, dir string, tracks []tags.Track, ask Prompter) (item
 				it.set(f.key, f.value(&it.Track), answer)
 			}
 			for it.Track.Track == 0 {
-				answer, err := ask("Track number for "+it.Src, "")
+				answer, err := ask("Track number for "+it.Src, trackDef)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -150,7 +157,8 @@ func planAlbum(root, codec, dir string, tracks []tags.Track, ask Prompter) (item
 		src := codecOf(it.Src)
 		it.Codec = src
 		// Only lossless sources are converted; re-encoding lossy audio loses quality.
-		if src == "flac" && codec != "flac" {
+		// WAV is always converted, as a library doesn't store it.
+		if src == "wav" || src == "flac" && codec != "flac" {
 			it.Codec = codec
 			it.Transcode = true
 		}
@@ -199,6 +207,23 @@ func destPath(root string, t tags.Track, multiDisc bool, ext string) string {
 	return filepath.Join(root, sanitize(t.Genre), artist, sanitize(t.Album), name+ext)
 }
 
+// numberedName matches a file name that starts with a track number, such as
+// "03 - Title", "03. Title" or "03_Title". The library's own "2-03. Title" has
+// the disc number in front.
+var numberedName = regexp.MustCompile(`^(?:\d-)?(\d{1,3})[\s._-]+(.+)$`)
+
+// guessFromName returns the track number and title that a file's name
+// suggests. Without a leading track number the whole name is the title.
+func guessFromName(path string) (track int, title string) {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if m := numberedName.FindStringSubmatch(name); m != nil {
+		if n, _ := strconv.Atoi(m[1]); n > 0 {
+			return n, strings.TrimSpace(m[2])
+		}
+	}
+	return 0, name
+}
+
 // sanitize makes a tag value usable as one path element.
 func sanitize(s string) string {
 	s = strings.Map(func(r rune) rune {
@@ -216,6 +241,8 @@ func codecOf(path string) string {
 		return "flac"
 	case ".opus":
 		return "opus"
+	case ".wav":
+		return "wav"
 	}
 	return "vorbis"
 }

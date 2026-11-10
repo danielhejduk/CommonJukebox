@@ -151,6 +151,36 @@ func TestMissingTrack(t *testing.T) {
 			want: []Problem{{"a", "missing-track", "disc 2 track 1 is missing"}},
 		},
 		{
+			// Some albums number their tracks straight through all discs.
+			name: "disc continues where the one before ended",
+			tracks: []tags.Track{
+				numbered("a/1-1.flac", 1, 1),
+				numbered("a/1-2.flac", 1, 2),
+				numbered("a/2-3.flac", 2, 3),
+				numbered("a/2-4.flac", 2, 4),
+				numbered("a/3-5.flac", 3, 5),
+			},
+		},
+		{
+			name: "gap in a disc that continues",
+			tracks: []tags.Track{
+				numbered("a/1-1.flac", 1, 1),
+				numbered("a/1-2.flac", 1, 2),
+				numbered("a/2-3.flac", 2, 3),
+				numbered("a/2-5.flac", 2, 5),
+			},
+			want: []Problem{{"a", "missing-track", "disc 2 track 4 is missing"}},
+		},
+		{
+			name: "disc that neither starts at 1 nor continues",
+			tracks: []tags.Track{
+				numbered("a/1-1.flac", 1, 1),
+				numbered("a/1-2.flac", 1, 2),
+				numbered("a/2-4.flac", 2, 4),
+			},
+			want: []Problem{{"a", "missing-track", "disc 2 tracks 1, 2, 3 are missing"}},
+		},
+		{
 			// checkTrack reports the missing number; it is not counted as a gap.
 			name:   "no track number",
 			tracks: []tags.Track{numbered("a/1.flac", 0, 1), numbered("a/x.flac", 0, 0)},

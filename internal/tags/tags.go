@@ -37,7 +37,8 @@ type meta struct {
 var errUnsupported = errors.New("unsupported file type")
 
 // Comments returns the raw "KEY=value" tags of a .flac, .ogg or .opus file.
-// Embedded pictures are left out.
+// The tags of a .wav file are returned in the same form. Embedded pictures
+// are left out.
 func Comments(path string) ([]string, error) {
 	m, err := readMeta(path)
 	if err != nil {
@@ -54,7 +55,7 @@ func CopyComments(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return modify(dst, func(m *meta) { m.comments = comments })
+	return Replace(dst, comments)
 }
 
 func readMeta(path string) (meta, error) {
@@ -70,6 +71,8 @@ func readMeta(path string) (meta, error) {
 		m, err = readFLAC(f)
 	case ".ogg", ".opus":
 		m, err = readOgg(f)
+	case ".wav":
+		m.comments, err = readWAV(f)
 	default:
 		err = errUnsupported
 	}
@@ -79,7 +82,7 @@ func readMeta(path string) (meta, error) {
 	return m, nil
 }
 
-// Read reads the tags of a .flac, .ogg or .opus file.
+// Read reads the tags of a .flac, .ogg, .opus or .wav file.
 func Read(path string) (Track, error) {
 	m, err := readMeta(path)
 	if err != nil {
@@ -129,13 +132,19 @@ func Read(path string) (Track, error) {
 	}, nil
 }
 
-// Write sets tags in a file. changes maps an uppercase key (e.g. "ARTIST") to
+// Write sets tags in a .flac, .ogg or .opus file. changes maps an uppercase key (e.g. "ARTIST") to
 // its new value; an empty value removes the tag. Other tags are kept.
 //
 // The new file is written next to the original and renamed over it, so a
 // crash never leaves a half-written track.
 func Write(path string, changes map[string]string) error {
 	return modify(path, func(m *meta) { m.comments = applyChanges(m.comments, changes) })
+}
+
+// Replace sets the tags of a file to comments, dropping all others. Its
+// pictures are kept.
+func Replace(path string, comments []string) error {
+	return modify(path, func(m *meta) { m.comments = comments })
 }
 
 // modify rewrites a file with its meta changed by update, atomically like

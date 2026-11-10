@@ -94,14 +94,27 @@ func checkAlbum(a Album) []Problem {
 		seen[key] = t.Path
 	}
 
-	// Every disc should have tracks 1 to its highest track number.
-	last := map[int]int{} // disc -> highest track number
+	// Every disc should have all tracks up to its highest track number,
+	// counting from 1 or, in an album that numbers its tracks straight
+	// through, from where the disc before it ended.
+	first, last := map[int]int{}, map[int]int{} // disc -> lowest, highest track number
 	for key := range seen {
-		last[key[0]] = max(last[key[0]], key[1])
+		disc, n := key[0], key[1]
+		if first[disc] == 0 || n < first[disc] {
+			first[disc] = n
+		}
+		last[disc] = max(last[disc], n)
 	}
+	prev := 0 // highest track number of the disc before
 	for _, disc := range slices.Sorted(maps.Keys(last)) {
+		start := 1
+		if first[disc] == prev+1 {
+			start = first[disc]
+		}
+		prev = last[disc]
+
 		var missing []string
-		for n := 1; n <= last[disc]; n++ {
+		for n := start; n <= last[disc]; n++ {
 			if _, ok := seen[[2]int{disc, n}]; !ok {
 				missing = append(missing, strconv.Itoa(n))
 			}

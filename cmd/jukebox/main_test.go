@@ -1,9 +1,12 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/danielhejduk/commonjukebox/internal/library"
 	"github.com/danielhejduk/commonjukebox/internal/tags"
 )
 
@@ -24,5 +27,23 @@ func TestCompareTracks(t *testing.T) {
 		if got[i].Path != want[i].Path {
 			t.Fatalf("position %d: got %s, want %s", i, got[i].Path, want[i].Path)
 		}
+	}
+}
+
+// Only add takes WAV files; the commands that work on library files don't.
+func TestCollectFilesWAV(t *testing.T) {
+	dir := t.TempDir()
+	wav := filepath.Join(dir, "rip.wav")
+	if err := os.WriteFile(wav, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, errs := collectFiles(library.ScanSources, []string{dir})
+	if len(errs) > 0 || !slices.Equal(files, []string{wav}) {
+		t.Errorf("sources: got %v, errors %v, want %v", files, errs, []string{wav})
+	}
+	files, errs = collectFiles(library.Scan, []string{dir})
+	if len(files) > 0 || len(errs) != 1 {
+		t.Errorf("library files: got %v, errors %v, want one error", files, errs)
 	}
 }

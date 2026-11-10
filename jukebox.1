@@ -208,11 +208,24 @@ Files that are already lossy are copied as they are, with a warning if their
 codec differs from the library's, since converting them again would lose
 quality.
 .PP
+WAV files are always converted, to FLAC when the library's codec is
+.BR flac ,
+since a library does not store them.
+Their title, artist, album artist, album, genre, date, track and disc number
+are read from the ID3 tag (version 2.3 or 2.4) if the file has one.
+The RIFF INFO chunk supplies what the ID3 tag lacks, except album artist and
+disc number, which it cannot hold; an INFO value that is not UTF\-8 counts as
+missing.
+Other fields are not kept.
+.PP
 When standard input is a terminal,
 .B add
 asks for tags the path needs and that are missing:
 genre, album artist and album once for each source directory,
 and artist, title and track number for each track.
+A file name such as
+.B "03 \- Title.wav"
+supplies the track number and title in brackets.
 Press Enter to accept the value in brackets.
 The answers are written to the copy in the library.
 Otherwise, tracks without those tags are reported and skipped.
@@ -327,8 +340,9 @@ Two tracks in the same album have the same disc and track number.
 The message names the track that had it first.
 .TP
 .B missing\-track
-A disc of an album does not have every track from 1 up to its highest track
-number.
+A disc of an album does not have every track up to its highest track number.
+The tracks of a disc are counted from 1, or from where the disc before it
+ended in an album that numbers its tracks straight through.
 The path is the album's directory.
 .TP
 .B inconsistent\-tag

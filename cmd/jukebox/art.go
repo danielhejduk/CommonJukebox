@@ -229,7 +229,7 @@ func findArtTargets(paths []string) (artTargets, []error) {
 	var errs []error
 	albums := map[string]bool{}
 	for _, p := range paths {
-		found, scanErrs := collectFiles([]string{p})
+		found, scanErrs := collectFiles(library.Scan, []string{p})
 		errs = append(errs, scanErrs...)
 		t.files = append(t.files, found...)
 

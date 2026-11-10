@@ -2,6 +2,7 @@ package add
 
 import (
 	"bytes"
+	"cmp"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,6 +95,9 @@ func TestPlan(t *testing.T) {
 		{"lossy is not converted", "song.ogg", "flac", "hip-hop/Kanye West/ye [E]/06. Ghost Town.ogg", false},
 		{"lossless is converted", "song.flac", "opus", "hip-hop/Kanye West/ye [E]/06. Ghost Town.opus", true},
 		{"lossless to vorbis", "song.flac", "vorbis", "hip-hop/Kanye West/ye [E]/06. Ghost Town.ogg", true},
+		{"wav to flac", "song.wav", "flac", "hip-hop/Kanye West/ye [E]/06. Ghost Town.flac", true},
+		{"wav to opus", "song.wav", "opus", "hip-hop/Kanye West/ye [E]/06. Ghost Town.opus", true},
+		{"wav to vorbis", "song.wav", "vorbis", "hip-hop/Kanye West/ye [E]/06. Ghost Town.ogg", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -174,6 +178,100 @@ func TestPlanMissingTags(t *testing.T) {
 	})
 }
 
+func TestGuessFromName(t *testing.T) {
+	tests := []struct {
+		path  string
+		track int
+		title string
+	}{
+		{"rip/03 - Yikes.wav", 3, "Yikes"},
+		{"03. Yikes.flac", 3, "Yikes"},
+		{"03 Yikes.wav", 3, "Yikes"},
+		{"03_Yikes.wav", 3, "Yikes"},
+		{"03-Yikes.wav", 3, "Yikes"},
+		{"3 - All Mine.opus", 3, "All Mine"},
+		{"123. Outro.wav", 123, "Outro"},
+		{"2-03. Yikes.flac", 3, "Yikes"}, // the library's own name for disc 2, track 3
+		{"Yikes.wav", 0, "Yikes"},
+		{"1999.wav", 0, "1999"},
+		{"1999 - Remaster.wav", 0, "1999 - Remaster"},
+		{"03.wav", 0, "03"},
+		{"00 - Intro.wav", 0, "00 - Intro"},
+		{"No Mistakes v2.wav", 0, "No Mistakes v2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			track, title := guessFromName(tt.path)
+			if track != tt.track || title != tt.title {
+				t.Errorf("got %d, %q, want %d, %q", track, title, tt.track, tt.title)
+			}
+		})
+	}
+}
+
+// A WAV file often has no tags at all, so the file name is offered instead.
+func TestPlanOffersFileName(t *testing.T) {
+	dir := t.TempDir()
+	data, err := os.ReadFile(filepath.Join("..", "tags", "testdata", "song.wav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Cut the file off before its tags, which ffmpeg writes ahead of the audio.
+	untagged := filepath.Join(dir, "03 - Yikes.wav")
+	if err := os.WriteFile(untagged, data[:bytes.Index(data, []byte("LIST"))], 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if comments, err := tags.Comments(untagged); err != nil || len(comments) > 0 {
+		t.Fatalf("fixture has tags %q, error %v", comments, err)
+	}
+
+	defaults := map[string]string{}
+	ask := func(question, def string) (string, error) {
+		name, _, _ := strings.Cut(question, " for ")
+		defaults[name] = def
+		if def == "" && name != "Track number" { // an empty track number is not asked for again
+			return "x", nil
+		}
+		return def, nil
+	}
+	items, errs := Plan("lib", config.Settings{Codec: "flac"}, []string{untagged}, ask)
+	if len(errs) > 0 || len(items) != 1 {
+		t.Fatalf("got %d items, errors %v", len(items), errs)
+	}
+	if defaults["Title"] != "Yikes" || defaults["Track number"] != "3" {
+		t.Errorf("defaults = %v, want title Yikes and track number 3", defaults)
+	}
+	if want := filepath.Join("lib", "x", "x", "x", "03. Yikes.flac"); items[0].Dest != want {
+		t.Errorf("Dest %q, want %q", items[0].Dest, want)
+	}
+	if got := items[0].Changes; got["TITLE"] != "Yikes" || got["TRACKNUMBER"] != "3" {
+		t.Errorf("Changes = %v", got)
+	}
+}
+
+// Tags that are there win over the file name.
+func TestPlanKeepsTagsOverFileName(t *testing.T) {
+	dir := t.TempDir()
+	src := fixture(t, dir, "song.opus", map[string]string{"GENRE": ""})
+	renamed := filepath.Join(dir, "09 - Wrong.opus")
+	if err := os.Rename(src, renamed); err != nil {
+		t.Fatal(err)
+	}
+	ask := func(question, def string) (string, error) {
+		if strings.HasPrefix(question, "Title") || strings.HasPrefix(question, "Track number") {
+			t.Errorf("unexpected question %q", question)
+		}
+		return cmp.Or(def, "rap"), nil
+	}
+	items, errs := Plan("lib", config.Settings{Codec: "opus"}, []string{renamed}, ask)
+	if len(errs) > 0 || len(items) != 1 {
+		t.Fatalf("got %d items, errors %v", len(items), errs)
+	}
+	if want := filepath.Join("lib", "rap", "Kanye West", "ye [E]", "06. Ghost Town.opus"); items[0].Dest != want {
+		t.Errorf("Dest %q, want %q", items[0].Dest, want)
+	}
+}
+
 func mkdir(t *testing.T, parts ...string) string {
 	t.Helper()
 	dir := filepath.Join(parts...)
@@ -240,6 +338,76 @@ func TestExecuteTranscode(t *testing.T) {
 	}
 	if got.Artist != "Kanye West" || got.Album != "ye [E]" || got.Title != "Ghost Town" || got.Track != 6 || got.Genre != "hip-hop" {
 		t.Errorf("tags not kept: %+v", got)
+	}
+}
+
+func TestExecuteWAV(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	for _, codec := range config.Codecs {
+		t.Run(codec, func(t *testing.T) {
+			src := fixture(t, t.TempDir(), "song.wav", nil)
+			before, err := os.ReadFile(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			items, errs := Plan(t.TempDir(), config.Settings{Codec: codec}, []string{src}, nil)
+			if len(errs) > 0 {
+				t.Fatal(errs)
+			}
+			items[0].Changes = map[string]string{"ALBUMARTIST": "Kanye West"} // as if prompted
+			if err := Execute(items[0], false); err != nil {
+				t.Fatal(err)
+			}
+
+			got, err := tags.Comments(items[0].Dest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Only the tags jukebox reads from the WAV, not ffmpeg's own (ENCODER).
+			want := []string{"ARTIST=Kanye West", "DATE=2018", "GENRE=hip-hop", "TITLE=Ghost Town", "ALBUM=ye [E]", "TRACKNUMBER=6", "ALBUMARTIST=Kanye West"}
+			if !slices.Equal(got, want) {
+				t.Errorf("tags\n got %q\nwant %q", got, want)
+			}
+			if after, _ := os.ReadFile(src); !bytes.Equal(before, after) {
+				t.Error("source was changed")
+			}
+		})
+	}
+}
+
+func TestExecuteTranscodeKeepsRepeatedTags(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	src := fixture(t, t.TempDir(), "song.flac", nil)
+	comments, err := tags.Comments(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tags.Replace(src, append(comments, "ARTIST=Ye")); err != nil {
+		t.Fatal(err)
+	}
+	items, errs := Plan(t.TempDir(), config.Settings{Codec: "opus"}, []string{src}, nil)
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	if err := Execute(items[0], false); err != nil {
+		t.Fatal(err)
+	}
+	got, err := tags.Comments(items[0].Dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var artists []string
+	for _, c := range got {
+		if key, value, _ := strings.Cut(c, "="); strings.EqualFold(key, "ARTIST") {
+			artists = append(artists, value)
+		}
+	}
+	if want := []string{"Kanye West", "Ye"}; !slices.Equal(artists, want) {
+		t.Errorf("ARTIST = %q, want %q", artists, want)
 	}
 }
 
