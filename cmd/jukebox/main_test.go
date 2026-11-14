@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/danielhejduk/commonjukebox/internal/config"
 	"github.com/danielhejduk/commonjukebox/internal/library"
 	"github.com/danielhejduk/commonjukebox/internal/tags"
 )
@@ -45,5 +46,22 @@ func TestCollectFilesWAV(t *testing.T) {
 	files, errs = collectFiles(library.Scan, []string{dir})
 	if len(files) > 0 || len(errs) != 1 {
 		t.Errorf("library files: got %v, errors %v, want one error", files, errs)
+	}
+}
+
+func TestRemoteLine(t *testing.T) {
+	tests := []struct {
+		r    config.Remote
+		want string
+	}{
+		{config.Remote{URL: "ftp://nas/"}, "nas\tftp://nas/"},
+		{config.Remote{URL: "ftps://nas/", Insecure: true}, "nas\tftps://nas/ (insecure)"},
+		{config.Remote{URL: "sftp://me@nas/", Subsonic: "https://admin@nas:4747"}, "nas\tsftp://me@nas/ (subsonic https://admin@nas:4747)"},
+		{config.Remote{URL: "ftps://nas/", Insecure: true, Subsonic: "http://admin@nas"}, "nas\tftps://nas/ (insecure, subsonic http://admin@nas)"},
+	}
+	for _, tt := range tests {
+		if got := remoteLine("nas", tt.r); got != tt.want {
+			t.Errorf("remoteLine(%+v) = %q, want %q", tt.r, got, tt.want)
+		}
 	}
 }

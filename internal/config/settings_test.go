@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -19,6 +20,17 @@ func TestLoadSettings(t *testing.T) {
 		{name: "unknown keys", file: "# x\nfoo = bar\n", want: DefaultSettings()},
 		{name: "bad codec", file: "codec = mp3\n", wantErr: `unknown codec "mp3"`},
 		{name: "malformed line", file: "codec opus\n", wantErr: ":1: expected key = value"},
+		{
+			name: "ffmpeg args",
+			file: "codec = opus\nffmpeg.opus =  -b:a 128k   -vbr on\n",
+			want: Settings{Codec: "opus", FFmpegArgs: map[string][]string{"opus": {"-b:a", "128k", "-vbr", "on"}}},
+		},
+		{
+			name: "empty ffmpeg args reset",
+			file: "ffmpeg.opus = -b:a 96k\nffmpeg.vorbis = -q:a 4\nffmpeg.opus =\n",
+			want: Settings{Codec: "flac", FFmpegArgs: map[string][]string{"vorbis": {"-q:a", "4"}}},
+		},
+		{name: "ffmpeg args for unknown codec", file: "ffmpeg.mp3 = -b:a 320k\n", wantErr: `ffmpeg.mp3: unknown codec "mp3"`},
 	}
 
 	for _, tt := range tests {
@@ -38,7 +50,7 @@ func TestLoadSettings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got != tt.want {
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("LoadSettings = %+v, want %+v", got, tt.want)
 			}
 		})

@@ -23,12 +23,13 @@ import (
 )
 
 type Item struct {
-	Src       string
-	Dest      string
-	Track     tags.Track
-	Changes   map[string]string
-	Codec     string
-	Transcode bool
+	Src        string
+	Dest       string
+	Track      tags.Track
+	Changes    map[string]string
+	Codec      string
+	Transcode  bool
+	FFmpegArgs []string // encoder options when transcoding; empty means the defaults
 }
 
 type Prompter func(question, def string) (string, error)
@@ -69,7 +70,7 @@ func Plan(root string, s config.Settings, files []string, ask Prompter) ([]Item,
 
 	var items []Item
 	for _, dir := range dirs {
-		planned, planErrs, err := planAlbum(root, s.Codec, dir, byDir[dir], ask)
+		planned, planErrs, err := planAlbum(root, s, dir, byDir[dir], ask)
 		if err != nil {
 			return nil, append(errs, err) // the prompt failed, so stop asking
 		}
@@ -79,7 +80,8 @@ func Plan(root string, s config.Settings, files []string, ask Prompter) ([]Item,
 	return items, errs
 }
 
-func planAlbum(root, codec, dir string, tracks []tags.Track, ask Prompter) (items []Item, errs []error, err error) {
+func planAlbum(root string, s config.Settings, dir string, tracks []tags.Track, ask Prompter) (items []Item, errs []error, err error) {
+	codec := s.Codec
 	items = make([]Item, len(tracks))
 	for i, t := range tracks {
 		items[i] = Item{Src: t.Path, Track: t, Changes: map[string]string{}}
@@ -161,6 +163,7 @@ func planAlbum(root, codec, dir string, tracks []tags.Track, ask Prompter) (item
 		if src == "wav" || src == "flac" && codec != "flac" {
 			it.Codec = codec
 			it.Transcode = true
+			it.FFmpegArgs = s.FFmpegArgs[codec]
 		}
 		it.Dest = destPath(root, it.Track, multiDisc, extFor(it.Codec))
 		it.Track.Path = it.Dest
@@ -328,7 +331,7 @@ func Execute(it Item, force bool) error {
 	if it.Transcode {
 		err = tmp.Close()
 		if err == nil {
-			err = transcode.Transcode(it.Src, tmp.Name(), it.Codec)
+			err = transcode.Transcode(it.Src, tmp.Name(), it.Codec, it.FFmpegArgs)
 		}
 	} else {
 		err = copyFile(tmp, it.Src)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,11 @@ import (
 // Settings are stored inside the library, so they travel with it.
 type Settings struct {
 	Codec string // codec new tracks are stored in: flac, opus or vorbis
+
+	// FFmpegArgs holds encoder options set as ffmpeg.<codec> = <args>,
+	// replacing the built-in ones for that codec. Codecs without an entry
+	// use the built-in options.
+	FFmpegArgs map[string][]string
 }
 
 // Codecs lists the valid values of Settings.Codec.
@@ -45,13 +51,34 @@ func LoadSettings(root string) (Settings, error) {
 	err = parse(f, path, func(key, value string) {
 		if key == "codec" {
 			s.Codec = value
+			return
 		}
+		codec, ok := strings.CutPrefix(key, "ffmpeg.")
+		if !ok {
+			return
+		}
+		// An empty value goes back to the built-in options.
+		args := strings.Fields(value)
+		if len(args) == 0 {
+			delete(s.FFmpegArgs, codec)
+			return
+		}
+		if s.FFmpegArgs == nil {
+			s.FFmpegArgs = map[string][]string{}
+		}
+		s.FFmpegArgs[codec] = args
 	})
 	if err != nil {
 		return Settings{}, err
 	}
 	if err := checkCodec(s.Codec); err != nil {
 		return Settings{}, fmt.Errorf("%s: %w", path, err)
+	}
+	// A misspelt codec would otherwise be ignored without a word.
+	for _, codec := range slices.Sorted(maps.Keys(s.FFmpegArgs)) {
+		if err := checkCodec(codec); err != nil {
+			return Settings{}, fmt.Errorf("%s: ffmpeg.%s: %w", path, codec, err)
+		}
 	}
 	return s, nil
 }

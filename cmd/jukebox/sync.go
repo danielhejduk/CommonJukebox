@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 
 	"github.com/danielhejduk/commonjukebox/internal/config"
 	jsync "github.com/danielhejduk/commonjukebox/internal/mirror"
@@ -25,20 +26,22 @@ func runRemote(args []string) error {
 			return runRemoteRemove(args[1:])
 		}
 	}
-	return errors.New("usage: jukebox remote add [--insecure] <name> <url> | jukebox remote list | jukebox remote remove <name>")
+	return errors.New("usage: jukebox remote add [--insecure] [--subsonic url] <name> <url> | jukebox remote list | jukebox remote remove <name>")
 }
 
 func runRemoteAdd(args []string) error {
 	fs, lib := newFlagSet("remote add")
 	insecure := fs.Bool("insecure", false, "don't verify the server's TLS certificate or SSH host key")
+	subsonic := fs.String("subsonic", "", "Subsonic server serving the remote, as http(s)://user@host[:port]")
 	cfg, err := parseWithConfig(fs, lib, args)
 	if err != nil {
 		return err
 	}
 	if fs.NArg() != 2 {
-		return errors.New("usage: jukebox remote add [--library path] [--insecure] <name> <url>")
+		return errors.New("usage: jukebox remote add [--library path] [--insecure] [--subsonic url] <name> <url>")
 	}
-	if err := config.SetRemote(cfg.Library, fs.Arg(0), config.Remote{URL: fs.Arg(1), Insecure: *insecure}); err != nil {
+	r := config.Remote{URL: fs.Arg(1), Insecure: *insecure, Subsonic: *subsonic}
+	if err := config.SetRemote(cfg.Library, fs.Arg(0), r); err != nil {
 		return err
 	}
 	fmt.Printf("remote %s set to %s in %s\n", fs.Arg(0), fs.Arg(1), config.SettingsPath(cfg.Library))
@@ -61,14 +64,25 @@ func runRemoteList(args []string) error {
 	}
 	slices.Sort(names)
 	for _, name := range names {
-		r := remotes[name]
-		extra := ""
-		if r.Insecure {
-			extra = " (insecure)"
-		}
-		fmt.Printf("%s\t%s%s\n", name, r.URL, extra)
+		fmt.Println(remoteLine(name, remotes[name]))
 	}
 	return nil
+}
+
+// remoteLine describes a remote for jukebox remote list.
+func remoteLine(name string, r config.Remote) string {
+	var notes []string
+	if r.Insecure {
+		notes = append(notes, "insecure")
+	}
+	if r.Subsonic != "" {
+		notes = append(notes, "subsonic "+r.Subsonic)
+	}
+	line := name + "\t" + r.URL
+	if len(notes) > 0 {
+		line += " (" + strings.Join(notes, ", ") + ")"
+	}
+	return line
 }
 
 func runRemoteRemove(args []string) error {
@@ -136,7 +150,7 @@ func runSync(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer rem.Close()
+defer rem.Close()
 	local := remote.NewLocal(cfg.Library)
 
 	localFiles, err := local.List()

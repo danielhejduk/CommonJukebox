@@ -14,10 +14,14 @@ import (
 )
 
 // Remote is a sync target stored in the library's settings file as
-// remote.<name>.url and remote.<name>.insecure.
+// remote.<name>.url, remote.<name>.insecure and remote.<name>.subsonic.
 type Remote struct {
 	URL      string
 	Insecure bool // skip TLS certificate or SSH host key verification
+
+	// Subsonic is the Subsonic server (such as gonic) that serves the
+	// remote's files, as http(s)://user@host[:port][/path], or empty.
+	Subsonic string
 }
 
 // RemoteSchemes lists the URL schemes a remote may use.
@@ -50,6 +54,8 @@ func LoadRemotes(root string) (map[string]Remote, error) {
 			r.URL = value
 		case "insecure":
 			r.Insecure = value == "true"
+		case "subsonic":
+			r.Subsonic = value
 		default:
 			return
 		}
@@ -59,7 +65,7 @@ func LoadRemotes(root string) (map[string]Remote, error) {
 		return nil, err
 	}
 	for name, r := range remotes {
-		if err := checkRemoteURL(r.URL); err != nil {
+		if err := checkRemote(r); err != nil {
 			return nil, fmt.Errorf("%s: remote %s: %w", path, name, err)
 		}
 	}
@@ -84,22 +90,36 @@ func SetRemote(root, name string, r Remote) error {
 	if !remoteName.MatchString(name) {
 		return fmt.Errorf("invalid remote name %q (use letters, digits, - and _)", name)
 	}
-	if err := checkRemoteURL(r.URL); err != nil {
+	if err := checkRemote(r); err != nil {
 		return err
 	}
-	u, _ := url.Parse(r.URL)
-	if _, ok := u.User.Password(); ok {
-		return errors.New("the settings file travels with the library, so don't put the password in the URL; use JUKEBOX_PASSWORD or ~/.netrc")
+	for _, raw := range []string{r.URL, r.Subsonic} {
+		u, _ := url.Parse(raw)
+		if _, ok := u.User.Password(); ok {
+			return errors.New("the settings file travels with the library, so don't put the password in the URL; use JUKEBOX_PASSWORD or ~/.netrc")
+		}
 	}
 
 	path := SettingsPath(root)
 	if err := setKey(path, "remote."+name+".url", r.URL, true); err != nil {
 		return err
 	}
+	insecure := ""
 	if r.Insecure {
-		return setKey(path, "remote."+name+".insecure", "true", true)
+		insecure = "true"
 	}
-	return removeKeys(path, func(key string) bool { return key == "remote."+name+".insecure" })
+	if err := setOrRemoveKey(path, "remote."+name+".insecure", insecure); err != nil {
+		return err
+	}
+	return setOrRemoveKey(path, "remote."+name+".subsonic", r.Subsonic)
+}
+
+// setOrRemoveKey sets key to value, or removes it when value is empty.
+func setOrRemoveKey(path, key, value string) error {
+	if value == "" {
+		return removeKeys(path, func(k string) bool { return k == key })
+	}
+	return setKey(path, key, value, true)
 }
 
 // RemoveRemote deletes the named remote from the settings file.
@@ -115,6 +135,38 @@ func RemoveRemote(root, name string) error {
 		n, _, ok := remoteKey(key)
 		return ok && n == name
 	})
+}
+
+func checkRemote(r Remote) error {
+	if err := checkRemoteURL(r.URL); err != nil {
+		return err
+	}
+	if r.Subsonic == "" {
+		return nil
+	}
+	if err := checkSubsonicURL(r.Subsonic); err != nil {
+		return fmt.Errorf("subsonic: %w", err)
+	}
+	return nil
+}
+
+// checkSubsonicURL wants a user in the URL: the Subsonic API has no
+// anonymous access, and the user picks the password from ~/.netrc.
+func checkSubsonicURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("%q: unsupported scheme (want http, https)", raw)
+	}
+	if u.Hostname() == "" {
+		return fmt.Errorf("%q: missing host", raw)
+	}
+	if u.User.Username() == "" {
+		return fmt.Errorf("%q: missing user (want %s://user@%s)", raw, u.Scheme, u.Host)
+	}
+	return nil
 }
 
 func checkRemoteURL(raw string) error {

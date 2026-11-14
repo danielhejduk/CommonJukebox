@@ -12,7 +12,8 @@ func TestRemotes(t *testing.T) {
 	root := t.TempDir()
 	writeSettings(t, root, "codec = opus\n")
 
-	if err := SetRemote(root, "phone", Remote{URL: "ftps://me@10.0.0.2:2121/Music", Insecure: true}); err != nil {
+	phone := Remote{URL: "ftps://me@10.0.0.2:2121/Music", Insecure: true, Subsonic: "https://admin@10.0.0.2:4747"}
+	if err := SetRemote(root, "phone", phone); err != nil {
 		t.Fatal(err)
 	}
 	if err := SetRemote(root, "nas", Remote{URL: "ftp://nas/music"}); err != nil {
@@ -22,11 +23,12 @@ func TestRemotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got["phone"] != (Remote{URL: "ftps://me@10.0.0.2:2121/Music", Insecure: true}) || got["nas"] != (Remote{URL: "ftp://nas/music"}) || len(got) != 2 {
+	if got["phone"] != phone || got["nas"] != (Remote{URL: "ftp://nas/music"}) || len(got) != 2 {
 		t.Fatalf("LoadRemotes = %+v", got)
 	}
 
-	// Replacing a remote drops the insecure flag it no longer has.
+	// Replacing a remote drops the insecure flag and Subsonic server it no
+	// longer has.
 	if err := SetRemote(root, "phone", Remote{URL: "ftps://me@10.0.0.2:2121/Music"}); err != nil {
 		t.Fatal(err)
 	}
@@ -50,20 +52,33 @@ func TestRemotes(t *testing.T) {
 
 func TestSetRemoteErrors(t *testing.T) {
 	tests := []struct {
-		name, remote, url, wantErr string
+		name, remote, url, subsonic, wantErr string
 	}{
 		{name: "bad name", remote: "a/b", url: "ftp://h/", wantErr: "invalid remote name"},
 		{name: "bad scheme", remote: "x", url: "smb://h/", wantErr: "unsupported scheme"},
 		{name: "no host", remote: "x", url: "ftp:///music", wantErr: "missing host"},
 		{name: "password", remote: "x", url: "ftp://me:pw@h/", wantErr: "don't put the password"},
+		{name: "subsonic scheme", remote: "x", url: "ftp://h/", subsonic: "ftp://admin@h/", wantErr: "subsonic: \"ftp://admin@h/\": unsupported scheme"},
+		{name: "subsonic no host", remote: "x", url: "ftp://h/", subsonic: "https://admin@/", wantErr: "subsonic: \"https://admin@/\": missing host"},
+		{name: "subsonic no user", remote: "x", url: "ftp://h/", subsonic: "https://h:4747", wantErr: "subsonic: \"https://h:4747\": missing user"},
+		{name: "subsonic password", remote: "x", url: "ftp://h/", subsonic: "https://admin:pw@h/", wantErr: "don't put the password"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := SetRemote(t.TempDir(), tt.remote, Remote{URL: tt.url})
+			err := SetRemote(t.TempDir(), tt.remote, Remote{URL: tt.url, Subsonic: tt.subsonic})
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("err = %v, want containing %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestLoadRemotesChecksSubsonic(t *testing.T) {
+	root := t.TempDir()
+	writeSettings(t, root, "remote.nas.url = ftp://nas/\nremote.nas.subsonic = http://nas:4747\n")
+	_, err := LoadRemotes(root)
+	if err == nil || !strings.Contains(err.Error(), "remote nas: subsonic: \"http://nas:4747\": missing user") {
+		t.Errorf("err = %v, want a missing user error", err)
 	}
 }
 

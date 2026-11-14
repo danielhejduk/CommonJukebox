@@ -752,7 +752,23 @@ which is
 or
 .B vorbis
 .RB ( flac
-when unset), and, for each remote,
+when unset);
+.BI ffmpeg. codec\fR,
+the encoder options
+.B add
+and
+.B transcode
+pass to
+.BR ffmpeg (1)
+for that codec, separated by spaces and without quoting, such as
+.B "ffmpeg.opus = \-b:a 128k \-vbr on"
+(they replace the built\-in
+.BR "\-compression_level 8" ,
+.B "\-b:a 160k \-vbr on"
+and
+.BR "\-q:a 6" ;
+empty or unset keeps them);
+and, for each remote,
 .BI remote. name .url
 and
 .BI remote. name .insecure

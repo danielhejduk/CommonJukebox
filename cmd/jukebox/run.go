@@ -405,7 +405,7 @@ func runTranscode(args []string) error {
 	if fs.NArg() != 2 {
 		return usageError("usage: jukebox transcode [--library path] <src> <dst>")
 	}
-	return transcode.Transcode(fs.Arg(0), fs.Arg(1), cfg.Settings.Codec)
+	return transcode.Transcode(fs.Arg(0), fs.Arg(1), cfg.Settings.Codec, cfg.Settings.FFmpegArgs[cfg.Settings.Codec])
 }
 
 func runVersion(args []string) error {

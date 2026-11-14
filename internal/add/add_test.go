@@ -102,7 +102,9 @@ func TestPlan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			src := fixture(t, t.TempDir(), tt.file, nil)
-			items, errs := Plan("lib", config.Settings{Codec: tt.codec}, []string{src}, nil)
+			args := []string{"-b:a", "96k"}
+			s := config.Settings{Codec: tt.codec, FFmpegArgs: map[string][]string{tt.codec: args}}
+			items, errs := Plan("lib", s, []string{src}, nil)
 			if len(errs) > 0 || len(items) != 1 {
 				t.Fatalf("got %d items, errors %v", len(items), errs)
 			}
@@ -112,6 +114,12 @@ func TestPlan(t *testing.T) {
 			}
 			if it.Transcode != tt.transcode {
 				t.Errorf("Transcode = %v, want %v", it.Transcode, tt.transcode)
+			}
+			if !tt.transcode {
+				args = nil
+			}
+			if !slices.Equal(it.FFmpegArgs, args) {
+				t.Errorf("FFmpegArgs = %q, want %q", it.FFmpegArgs, args)
 			}
 		})
 	}

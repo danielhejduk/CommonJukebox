@@ -21,7 +21,7 @@ func TestFlacTranscode(t *testing.T) {
 			src := filepath.Join("..", "tags", "testdata", name)
 			dst := filepath.Join(t.TempDir(), "out.flac")
 
-			if err := transcode.Transcode(src, dst, "flac"); err != nil {
+			if err := transcode.Transcode(src, dst, "flac", nil); err != nil {
 				t.Fatal(err)
 			}
 
@@ -47,4 +47,60 @@ func TestFlacTranscode(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTranscodeArgs(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	src := filepath.Join("..", "tags", "testdata", "song.flac")
+
+	for _, tt := range []struct {
+		name string
+		args []string
+		want int // sample rate; 0 means the source's
+	}{
+		{name: "defaults", args: nil},
+		{name: "custom", args: []string{"-ar", "8000"}, want: 8000},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dst := filepath.Join(t.TempDir(), "out.flac")
+			if err := transcode.Transcode(src, dst, "flac", tt.args); err != nil {
+				t.Fatal(err)
+			}
+			want := tt.want
+			if want == 0 {
+				want = flacSampleRate(t, src)
+			}
+			if got := flacSampleRate(t, dst); got != want {
+				t.Errorf("sample rate = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+func TestTranscodeBadArgs(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	src := filepath.Join("..", "tags", "testdata", "song.flac")
+	dst := filepath.Join(t.TempDir(), "out.flac")
+	if err := transcode.Transcode(src, dst, "flac", []string{"-no-such-option"}); err == nil {
+		t.Fatal("bad ffmpeg args did not fail")
+	}
+}
+
+// flacSampleRate reads the sample rate from the STREAMINFO block, which
+// always comes first after the "fLaC" marker and the block header.
+func flacSampleRate(t *testing.T, path string) int {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) < 21 || !bytes.HasPrefix(data, []byte("fLaC")) {
+		t.Fatalf("%s is not a FLAC file", path)
+	}
+	// marker 4, block header 4, block sizes 2+2, frame sizes 3+3, then 20 bits.
+	return int(data[18])<<12 | int(data[19])<<4 | int(data[20])>>4
 }
