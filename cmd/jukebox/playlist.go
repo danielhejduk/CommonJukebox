@@ -29,7 +29,7 @@ func runPlaylist(args []string) error {
 			return runPlaylistPull(args[1:])
 		}
 	}
-	return usageError("usage: jukebox playlist add | remove | list | show ...")
+	return usageError("usage: jukebox playlist add | remove | list | show | pull ...")
 }
 
 func runPlaylistAdd(args []string) error {
@@ -294,17 +294,92 @@ func runPlaylistShow(args []string) error {
 
 func runPlaylistPull(args []string) error {
 	fs, lib := newFlagSet("playlist pull")
+	dryRun := fs.Bool("dry-run", false, "print what would be written without writing it")
 	cfg, err := parseWithConfig(fs, lib, args)
 	if err != nil {
 		return err
 	}
-	if fs.NArg() == 0 {
+	if fs.NArg() < 1 {
 		return usageError("usage: jukebox playlist pull [--library path] <remote>")
 	}
 	remoteName := fs.Arg(0)
 	srv, err := openSubsonic(cfg.Library, remoteName)
-	lists, err := srv.Playlists()
-	return nil
+	if err != nil {
+		return err
+	}
+
+	var lists []gonic.Playlist
+	if names := fs.Args()[1:]; len(names) > 0 {
+		for _, name := range names {
+			p, err := findPlaylist(srv, remoteName, name)
+			if err != nil {
+				return err
+			}
+			lists = append(lists, *p)
+		}
+	} else if lists, err = srv.Playlists(); err != nil {
+		return err
+	}
+
+	var errs []error
+	written := map[string]string{}
+	for _, p := range lists {
+		file := playlistFile(p.Name)
+		if other, ok := written[strings.ToLower(file)]; ok {
+			errs = append(errs, fmt.Errorf("%s: playlists %q and %q would both be saved as %s; rename one", p.Name, other, p.Name, file))
+			continue
+		}
+		written[strings.ToLower(file)] = p.Name
+
+		full, err := srv.Get(p.ID)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", p.Name, err))
+			continue
+		}
+		if note := showNote(p.Name, p.SongCount, len(full.Songs)); note != "" {
+			fmt.Fprintln(os.Stderr, note)
+		}
+
+		target := filepath.Join(cfg.Library, file)
+		data := m3u(*full)
+		if old, err := os.ReadFile(target); err == nil && string(old) == string(data) {
+			fmt.Println("unchanged", file)
+			continue
+		}
+		if *dryRun {
+			fmt.Printf("would write %s (%d tracks)\n", file, len(full.Songs))
+			continue
+		}
+		if err := os.WriteFile(target, data, 0o644); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		fmt.Printf("wrote %s (%d tracks)\n", file, len(full.Songs))
+	}
+	return joinErrors(errs)
+}
+
+func playlistFile(name string) string {
+	name = strings.Map(func (r rune) rune  {
+		if r < ' ' || strings.ContainsRune(`/\:*?"<>|`, r) {
+			return '_'
+		}
+		return r
+	}, strings.TrimSpace(name))
+	if strings.Trim(name, ".") == "" {
+		name = strings.ReplaceAll(name, ".", "_") + "_"
+	}
+	return name + ".m3u8"
+}
+
+func m3u(p gonic.Playlist) []byte {
+	var b strings.Builder
+	b.WriteString("#EXTM3U\n")
+	b.WriteString("#PLAYLIST:" + strings.ReplaceAll(p.Name, "\n", " ") + "\n")
+	for _, s := range p.Songs {
+		b.WriteString(songPath(s.Path + "\n"))
+	}
+	return []byte(b.String())
 }
 
 // showNote explains what show leaves out. gonic's getPlaylists counts every

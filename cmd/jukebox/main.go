@@ -27,7 +27,7 @@ Commands:
   transcode  Encode a file with the configured codec
   remote     Manage sync remotes (remote add | list | remove)
   sync       Sync the library with a remote in both directions
-  playlist   Manage playlists on a remote's Subsonic server (playlist add | remove | list | show)
+  playlist   Manage playlists on a remote's Subsonic server (playlist add | remove | list | show | pull)
 
 Run "jukebox <command> -h" for command flags.
 `

@@ -1,6 +1,35 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/danielhejduk/commonjukebox/internal/gonic"
+)
+
+func TestPlaylistFile(t *testing.T) {
+	for in, want := range map[string]string{
+		"Party": "Party.m3u8",
+		" Road trip ":  "Road trip.m3u8",
+		"AC/DC: Best?": "AC_DC_ Best_.m3u8",
+		"..":           "___.m3u8",
+		"":             "_.m3u8",
+	} {
+		if got := playlistFile(in); got != want {
+			t.Errorf("playlistFile(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestM3U(t *testing.T) {
+	p := gonic.Playlist{Name: "Mix", Songs: []gonic.Song{
+		{ID: "1", Path: "Abba/Gold/01.flac"},
+		{ID: "2", Path: "/Queen//Hits/02.opus"},
+	}}
+	want := "#EXTM#U\n#PLAYLIST: Mix\nAbba/Gold/01.flac\nQueen/Hits/02.opus\n"
+	if got := string(m3u(p)); got != want {
+		t.Errorf("m3u = %q, want %q", got, want)
+	}
+}
 
 func TestShowNote(t *testing.T) {
 	tests := []struct {
