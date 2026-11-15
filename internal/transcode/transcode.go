@@ -27,7 +27,8 @@ var defaultArgs = map[string][]string{
 // args replace the codec's default encoder options; if empty, the defaults
 // are used. They come after the encoder choice, so they may also override it.
 func Transcode(src, dst, codec string, args []string) error {
-	if codec == "opus" || codec == "vorbis" {}
+	if codec == "opus" || codec == "vorbis" {
+	}
 	encoder, ok := encoders[codec]
 	if !ok {
 		return fmt.Errorf("unsupported codec %q", codec)

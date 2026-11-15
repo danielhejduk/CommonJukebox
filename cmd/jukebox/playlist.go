@@ -360,7 +360,7 @@ func runPlaylistPull(args []string) error {
 }
 
 func playlistFile(name string) string {
-	name = strings.Map(func (r rune) rune  {
+	name = strings.Map(func(r rune) rune {
 		if r < ' ' || strings.ContainsRune(`/\:*?"<>|`, r) {
 			return '_'
 		}

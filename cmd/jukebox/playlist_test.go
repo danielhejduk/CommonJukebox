@@ -8,7 +8,7 @@ import (
 
 func TestPlaylistFile(t *testing.T) {
 	for in, want := range map[string]string{
-		"Party": "Party.m3u8",
+		"Party":        "Party.m3u8",
 		" Road trip ":  "Road trip.m3u8",
 		"AC/DC: Best?": "AC_DC_ Best_.m3u8",
 		"..":           "___.m3u8",
