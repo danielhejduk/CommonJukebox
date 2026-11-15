@@ -75,7 +75,7 @@ func readWAV(r io.ReadSeeker) ([]string, error) {
 		}
 
 		for b := list[4:]; len(b) >= 8; {
-			id, n := string(b[:4]), uint64(binary.LittleEndian.Uint32(b[4:]))
+			key, n := wavInfoKeys[string(b[:4])], uint64(binary.LittleEndian.Uint32(b[4:]))
 			b = b[8:]
 			if n > uint64(len(b)) {
 				break
@@ -84,7 +84,6 @@ func readWAV(r io.ReadSeeker) ([]string, error) {
 			value = strings.TrimSpace(value)
 			b = b[min(n+n&1, uint64(len(b))):]
 
-			key := wavInfoKeys[id]
 			if key == "" || value == "" || seen[key] || !utf8.ValidString(value) {
 				continue
 			}

@@ -65,7 +65,7 @@ func parseID3(b []byte) []string {
 	var comments []string
 	seen := map[string]bool{}
 	for len(b) >= 10 && b[0] != 0 { // zero bytes pad the tag
-		id, n, format := string(b[:4]), id3Size(b[4:], v4), b[9]
+		key, n, format := id3Keys[string(b[:4])], id3Size(b[4:], v4), b[9]
 		b = b[10:]
 		if n > len(b) {
 			break
@@ -73,7 +73,6 @@ func parseID3(b []byte) []string {
 		data := b[:n]
 		b = b[n:]
 
-		key := id3Keys[id]
 		if key == "" || seen[key] {
 			continue
 		}
