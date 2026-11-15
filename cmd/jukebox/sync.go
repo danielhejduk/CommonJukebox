@@ -150,7 +150,7 @@ func runSync(args []string) error {
 	if err != nil {
 		return err
 	}
-defer rem.Close()
+	defer rem.Close()
 	local := remote.NewLocal(cfg.Library)
 
 	localFiles, err := local.List()
