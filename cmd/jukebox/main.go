@@ -54,6 +54,7 @@ var commands = map[string]command{
 	"tag":       runTag,
 	"check":     runCheck,
 	"transcode": runTranscode,
+	"reorganize":runReorganize,
 	"remote":    runRemote,
 	"sync":      runSync,
 	"playlist":  runPlaylist,

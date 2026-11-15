@@ -1,5 +1,5 @@
 # CommonJukebox
-An opinionated music library manager for FLAC, Ogg Vorbis and Opus files.
+An opinionated music library manager for FLAC, WAV, Ogg Vorbis and Opus files.
 Written in Go.
 
 `init` -> `add` -> `check` -> `sync`
@@ -16,7 +16,7 @@ Features:
 
 ## Installing
 
-Needs Go 1.27 and, for adding and re-encoding music, `ffmpeg`.
+Needs Go 1.26 and, for adding and re-encoding music, `ffmpeg`.
 
 ```sh
 make
