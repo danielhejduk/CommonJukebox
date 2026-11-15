@@ -21,9 +21,9 @@ type Move struct {
 }
 
 type Plan struct {
-	Moves []Move
-	Warnings []string
-	Skipped []error
+	Moves      []Move
+	Warnings   []string
+	Skipped    []error
 	Collisions []error
 }
 
@@ -75,7 +75,7 @@ func Build(root string, tracks []tags.Track, only []string) (Plan, error) {
 		}
 	}
 
-	slices.SortFunc(p.Moves, func(a, b Move) int { return cmp.Compare(a.From, b.From)})
+	slices.SortFunc(p.Moves, func(a, b Move) int { return cmp.Compare(a.From, b.From) })
 	p.Collisions = collisions(p.Moves)
 	return p, nil
 }
@@ -97,7 +97,7 @@ func scope(root string, only []string) (func(string) bool, error) {
 		}
 		dirs = append(dirs, filepath.Join(root, rel))
 	}
-	return func (p string) bool {
+	return func(p string) bool {
 		if len(dirs) == 0 {
 			return true
 		}

@@ -137,4 +137,3 @@ func rewritePlaylists(lib string, moves []reorganize.Move, dryRun bool) ([]strin
 	}
 	return changed, joinErrors(errs)
 }
-

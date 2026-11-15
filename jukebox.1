@@ -1,5 +1,5 @@
 '\" t
-.TH JUKEBOX 1 2026-10-24 "commonjukebox 0.1" "User Commands"
+.TH JUKEBOX 1 2026-11-16 "commonjukebox 0.1" "User Commands"
 .SH NAME
 jukebox \- opinionated music library manager
 .SH SYNOPSIS
@@ -35,6 +35,12 @@ jukebox \- opinionated music library manager
 .B jukebox check
 .RB [ \-\-library
 .IR path ]
+.br
+.B jukebox reorganize
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RI [ path ...]
 .br
 .B jukebox transcode
 .RB [ \-\-library
@@ -124,11 +130,14 @@ jukebox \- opinionated music library manager
 .RB [ \-\-dry\-run ]
 .IR path ...
 .br
+.B jukebox version
+.br
 .B jukebox
 .RB [ \-h | \-\-help | help ]
 .SH DESCRIPTION
 .B jukebox
-lists, searches, checks and tags the tracks of a music library.
+adds, lists, searches, checks, reorganizes and tags the tracks of a music
+library, and syncs it with remotes.
 .PP
 A library is a directory.
 Every file under it whose name ends in
@@ -136,26 +145,25 @@ Every file under it whose name ends in
 .B .ogg
 or
 .B .opus
-(in any case) is a track, however deeply it is nested.
+(in any case) and does not start with a dot is a track, however deeply it is
+nested.
 Other files are ignored.
 .PP
 The library is set once with
 .B jukebox init
 and stored in the config file, so later commands find it on their own.
-.BR list ,
-.BR search ,
-.B check
-and
-.B transcode
-accept
+Commands that use it accept
 .B \-\-library
 to use a different one for a single run.
 .B tag
 works on the paths it is given and does not use the library at all.
 .PP
-Flags may be written with one or two dashes.
-They must come before the command's other arguments:
-the first argument that is not a flag ends the flags.
+Flags may be written with one or two dashes, and may come before, after or
+between the command's other arguments.
+An argument
+.B \-\-
+ends the flags: every argument after it is taken as it is, even one that
+starts with a dash.
 .SH COMMANDS
 .SS init
 .B jukebox init
@@ -385,6 +393,82 @@ A track's
 .B ALBUMARTIST
 or year differs from the one most tracks of its album use.
 Tracks without the tag are not compared.
+.SS reorganize
+.B jukebox reorganize
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RI [ path ...]
+.PP
+Move the tracks of the library to where
+.B add
+would put them,
+.PP
+.RS
+.IR genre / "album artist" / album / "NN" ". " title . ext
+.RE
+.PP
+named by the same rules.
+Tracks are only moved, never rewritten or converted;
+only their extension is changed to lower case.
+With
+.IR path s,
+only the tracks among the given files and directories are moved.
+The paths must be inside the library.
+.PP
+Tracks in the same directory with the same
+.B ALBUM
+are an album and stay together:
+the album goes under the genre and album artist (or artist) that most of its
+tracks have, and each track whose tag differs is reported in a warning.
+If any track that ends up in an album's directory has a disc number above 1,
+every file name there starts with the disc number,
+so an album kept in one directory per disc is joined into one.
+.PP
+A track without a
+.BR GENRE ,
+.BR ALBUM ,
+.B TITLE
+or
+.B TRACKNUMBER
+tag, or without both
+.B ALBUMARTIST
+and
+.BR ARTIST ,
+is reported and left where it is, and the exit status is 1.
+A track whose tags cannot be read is left where it is with a warning.
+.PP
+Other files in a track's directory, such as its cover file, move with the
+tracks when all of that directory's tracks go to the same place;
+otherwise they stay, with a warning.
+Files whose names start with a dot, subdirectories and the files in the root
+of the library never move this way.
+.PP
+Nothing is moved if two files would end up with the same path, ignoring case,
+or a file would replace one that is already there; the collisions are
+reported and the exit status is 1.
+Otherwise each file is first moved to a temporary name in its new directory;
+if that fails for any file, the files moved so far are put back and nothing
+is moved.
+Directories left empty are removed.
+.PP
+Each move is printed as
+.PP
+.RS
+.BI moved " from " \-> " to"
+.RE
+.PP
+with paths relative to the library, followed by how many files were moved.
+The
+.B .m3u8
+playlists in the root of the library, such as those written by
+.BR "playlist pull" ,
+are updated to the tracks' new paths, and each one changed is printed.
+.TP
+.B \-\-dry\-run
+Print each move as
+.BI move " from " \-> " to"
+and the playlists that would be updated, but do not change anything.
 .SS transcode
 .B jukebox transcode
 .RB [ \-\-library
@@ -849,6 +933,11 @@ may be a track or a directory, which is searched the same way as the library.
 A path that cannot be read or holds no tracks is an error.
 An error on one file does not stop the others:
 all errors are printed at the end and the exit status is 1.
+.SS version
+.B jukebox version
+.PP
+Print the version of
+.BR jukebox .
 .SH TAGS
 .B jukebox
 reads and writes Vorbis comments, the tag format of FLAC, Ogg Vorbis and
@@ -886,6 +975,7 @@ Accepted by
 .BR list ,
 .BR search ,
 .BR check ,
+.BR reorganize ,
 .BR transcode ,
 .BR remote ,
 .B sync
@@ -987,7 +1077,9 @@ Success.
 .B 1
 The command failed,
 .B check
-found problems, or
+found problems,
+.B reorganize
+left tracks without the tags it needs, or
 .B sync
 skipped conflicts.
 .TP
@@ -1018,6 +1110,16 @@ Look for missing tags and tracks:
 .RS
 .EX
 jukebox check
+.EE
+.RE
+.PP
+Move the tracks of one directory into place after fixing their tags,
+trying it out first:
+.PP
+.RS
+.EX
+jukebox reorganize \-\-dry\-run ~/Music/unsorted
+jukebox reorganize ~/Music/unsorted
 .EE
 .RE
 .PP

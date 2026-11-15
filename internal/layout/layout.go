@@ -36,10 +36,10 @@ func Place(root string, tracks []Track) (dests []string, warnings []Warning) {
 	folders := make([]string, len(tracks))
 	for _, k := range order {
 		idx := albums[k]
-		genre := majorityOf(tracks, idx, &warnings, func (t Track) (string, string)  {
+		genre := majorityOf(tracks, idx, &warnings, func(t Track) (string, string) {
 			return "GENRE", Sanitize(t.Genre)
 		})
-		artist := majorityOf(tracks, idx, &warnings, func (t Track) (string, string)  {
+		artist := majorityOf(tracks, idx, &warnings, func(t Track) (string, string) {
 			if a := Sanitize(t.AlbumArtist); a != "" {
 				return "ALBUMARTIST", a
 			}

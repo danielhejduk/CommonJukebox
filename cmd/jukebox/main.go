@@ -18,16 +18,18 @@ import (
 const usage = `Usage: jukebox <command> [flags]
 
 Commands:
-  init       Set the library path in the config file
-  add        Copy new music into the library
-  list       List tracks in the library
-  search     Search tracks by artist, album or title
-  tag        Show or set tags (tag show | tag set)
-  check      Check tags for errors and duplicates
-  transcode  Encode a file with the configured codec
-  remote     Manage sync remotes (remote add | list | remove)
-  sync       Sync the library with a remote in both directions
-  playlist   Manage playlists on a remote's Subsonic server (playlist add | remove | list | show | pull)
+  init        Set the library path in the config file
+  add         Copy new music into the library
+  list        List tracks in the library
+  search      Search tracks by artist, album or title
+  tag         Show or set tags and cover art (tag show | set | art)
+  check       Check tags for errors and duplicates
+  reorganize  Move tracks into the library's folder layout
+  transcode   Encode a file with the configured codec
+  remote      Manage sync remotes (remote add | list | remove)
+  sync        Sync the library with a remote in both directions
+  playlist    Manage playlists on a remote's Subsonic server (playlist add | remove | list | show | pull)
+  version     Print the version
 
 Run "jukebox <command> -h" for command flags.
 `
@@ -47,18 +49,18 @@ func versionString() string {
 }
 
 var commands = map[string]command{
-	"init":      runInit,
-	"add":       runAdd,
-	"list":      runList,
-	"search":    runSearch,
-	"tag":       runTag,
-	"check":     runCheck,
-	"transcode": runTranscode,
-	"reorganize":runReorganize,
-	"remote":    runRemote,
-	"sync":      runSync,
-	"playlist":  runPlaylist,
-	"version":   runVersion,
+	"init":       runInit,
+	"add":        runAdd,
+	"list":       runList,
+	"search":     runSearch,
+	"tag":        runTag,
+	"check":      runCheck,
+	"transcode":  runTranscode,
+	"reorganize": runReorganize,
+	"remote":     runRemote,
+	"sync":       runSync,
+	"playlist":   runPlaylist,
+	"version":    runVersion,
 }
 
 func main() {
