@@ -18,6 +18,14 @@ Features:
 
 Needs Go 1.26 and, for adding and re-encoding music, `ffmpeg`.
 
+On macOS, Homebrew's `ffmpeg` is built without the Vorbis encoder (libvorbis).
+For a `vorbis` library, install `ffmpeg-full` instead and put it on your `PATH`:
+
+```sh
+brew install ffmpeg-full
+export PATH="$(brew --prefix ffmpeg-full)/bin:$PATH"
+```
+
 ```sh
 make
 sudo make install    # installs to /usr; set PREFIX to change that

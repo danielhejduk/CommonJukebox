@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"runtime"
 	"slices"
 	"strconv"
@@ -119,8 +118,8 @@ func runAdd(args []string) error {
 	}
 
 	if slices.ContainsFunc(items, func(it add.Item) bool { return it.Transcode }) {
-		if _, err := exec.LookPath("ffmpeg"); err != nil {
-			return joinErrors(append(errs, fmt.Errorf("converting to %s needs ffmpeg: %w", cfg.Settings.Codec, err)))
+		if err := transcode.Check(cfg.Settings.Codec, cfg.Settings.FFmpegArgs[cfg.Settings.Codec]); err != nil {
+			return joinErrors(append(errs, err))
 		}
 	}
 	for _, it := range items {
@@ -405,7 +404,11 @@ func runTranscode(args []string) error {
 	if fs.NArg() != 2 {
 		return usageError("usage: jukebox transcode [--library path] <src> <dst>")
 	}
-	return transcode.Transcode(fs.Arg(0), fs.Arg(1), cfg.Settings.Codec, cfg.Settings.FFmpegArgs[cfg.Settings.Codec])
+	codec, ffmpegArgs := cfg.Settings.Codec, cfg.Settings.FFmpegArgs[cfg.Settings.Codec]
+	if err := transcode.Check(codec, ffmpegArgs); err != nil {
+		return err
+	}
+	return transcode.Transcode(fs.Arg(0), fs.Arg(1), codec, ffmpegArgs)
 }
 
 func runVersion(args []string) error {

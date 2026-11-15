@@ -33,9 +33,14 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
+      # Homebrew's plain ffmpeg formula is built without libvorbis; only the
+      # keg-only ffmpeg-full has it, so put that on PATH explicitly.
       - name: Install ffmpeg (macOS)
         if: runner.os == 'macOS'
-        run: brew install ffmpeg
+        run: |
+          brew install ffmpeg-full
+          echo "$(brew --prefix ffmpeg-full)/bin" >> "$GITHUB_PATH"
+          "$(brew --prefix ffmpeg-full)/bin/ffmpeg" -hide_banner -encoders | grep libvorbis
 
       - name: Build
         run: make jukebox

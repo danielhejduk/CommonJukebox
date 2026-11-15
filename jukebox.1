@@ -249,6 +249,17 @@ or
 Files that are already lossy are copied as they are, with a warning if their
 codec differs from the library's, since converting them again would lose
 quality.
+Before converting anything,
+.B add
+stops if
+.BR ffmpeg (1)
+lacks the encoder it would use:
+.B libopus
+or
+.BR libvorbis ,
+or the one the
+.BI ffmpeg. codec
+setting chooses.
 .PP
 WAV files are always converted, to FLAC when the library's codec is
 .BR flac ,
