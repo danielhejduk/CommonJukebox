@@ -292,6 +292,9 @@ func runPlaylistShow(args []string) error {
 	return nil
 }
 
+// runPlaylistPull saves the server's playlists, or the named ones, in the
+// library root as <name>.m3u8 files. Their paths are relative to the
+// library root, so players reading the library find the tracks.
 func runPlaylistPull(args []string) error {
 	fs, lib := newFlagSet("playlist pull")
 	dryRun := fs.Bool("dry-run", false, "print what would be written without writing it")
@@ -300,7 +303,7 @@ func runPlaylistPull(args []string) error {
 		return err
 	}
 	if fs.NArg() < 1 {
-		return usageError("usage: jukebox playlist pull [--library path] <remote>")
+		return usageError("usage: jukebox playlist pull [--library path] [--dry-run] <remote> [playlist]...")
 	}
 	remoteName := fs.Arg(0)
 	srv, err := openSubsonic(cfg.Library, remoteName)
@@ -322,7 +325,7 @@ func runPlaylistPull(args []string) error {
 	}
 
 	var errs []error
-	written := map[string]string{}
+	written := map[string]string{} // file name -> playlist name
 	for _, p := range lists {
 		file := playlistFile(p.Name)
 		if other, ok := written[strings.ToLower(file)]; ok {
@@ -359,6 +362,8 @@ func runPlaylistPull(args []string) error {
 	return joinErrors(errs)
 }
 
+// playlistFile is the name of the file runPlaylistPull saves the playlist
+// called name in. Characters that can't be in a file name become _.
 func playlistFile(name string) string {
 	name = strings.Map(func(r rune) rune {
 		if r < ' ' || strings.ContainsRune(`/\:*?"<>|`, r) {
@@ -372,12 +377,14 @@ func playlistFile(name string) string {
 	return name + ".m3u8"
 }
 
+// m3u renders the playlist as an extended M3U file with slash-separated
+// paths relative to the library root.
 func m3u(p gonic.Playlist) []byte {
 	var b strings.Builder
 	b.WriteString("#EXTM3U\n")
 	b.WriteString("#PLAYLIST:" + strings.ReplaceAll(p.Name, "\n", " ") + "\n")
 	for _, s := range p.Songs {
-		b.WriteString(songPath(s.Path + "\n"))
+		b.WriteString(songPath(s.Path) + "\n")
 	}
 	return []byte(b.String())
 }

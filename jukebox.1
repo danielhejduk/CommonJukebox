@@ -45,6 +45,8 @@ jukebox \- opinionated music library manager
 .RB [ \-\-library
 .IR path ]
 .RB [ \-\-insecure ]
+.RB [ \-\-subsonic
+.IR url ]
 .I name url
 .br
 .B jukebox remote list
@@ -64,6 +66,38 @@ jukebox \- opinionated music library manager
 .BR local | remote ]
 .RB [ \-\-force ]
 .I name
+.br
+.B jukebox playlist add
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.RB [ \-\-no\-scan ]
+.I remote playlist
+.IR path ...
+.br
+.B jukebox playlist remove
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.I remote playlist
+.RI [ path ...]
+.br
+.B jukebox playlist list
+.RB [ \-\-library
+.IR path ]
+.I remote
+.br
+.B jukebox playlist show
+.RB [ \-\-library
+.IR path ]
+.I remote playlist
+.br
+.B jukebox playlist pull
+.RB [ \-\-library
+.IR path ]
+.RB [ \-\-dry\-run ]
+.I remote
+.RI [ playlist ...]
 .br
 .B jukebox tag show
 .IR path ...
@@ -374,6 +408,8 @@ may be anywhere.
 .SS remote
 .B jukebox remote add
 .RB [ \-\-insecure ]
+.RB [ \-\-subsonic
+.IR url ]
 .I name url
 .br
 .B jukebox remote list
@@ -437,6 +473,15 @@ Do not verify the server's TLS certificate, for example one that is
 self-signed, or, for
 .BR sftp ,
 its SSH host key.
+.TP
+.BI \-\-subsonic " url"
+The Subsonic server, such as gonic, that serves the remote's tracks, as
+.BR http:// \fIuser\fR@\fIhost\fR[:\fIport\fR]
+or
+.BR https:// \fIuser\fR@\fIhost\fR[:\fIport\fR].
+The user is required, since the Subsonic API has no anonymous access.
+.B playlist
+needs it.
 .SS sync
 .B jukebox sync
 .RB [ \-\-library
@@ -495,6 +540,127 @@ the library on one side.
 Without it,
 .B sync
 refuses, since that usually means the remote is empty or not mounted.
+.SS playlist
+.B jukebox playlist add
+.RB [ \-\-dry\-run ]
+.RB [ \-\-no\-scan ]
+.I remote playlist
+.IR path ...
+.br
+.B jukebox playlist remove
+.RB [ \-\-dry\-run ]
+.I remote playlist
+.RI [ path ...]
+.br
+.B jukebox playlist list
+.I remote
+.br
+.B jukebox playlist show
+.I remote playlist
+.br
+.B jukebox playlist pull
+.RB [ \-\-dry\-run ]
+.I remote
+.RI [ playlist ...]
+.PP
+Manage the playlists on the Subsonic server of the remote
+.IR remote ,
+set with
+.BR "remote add \-\-subsonic" .
+The server must serve the same tracks as the library, as it does after a
+.BR sync ,
+since tracks are matched by their path relative to the library.
+Playlist names are matched ignoring case;
+it is an error if several playlists on the server have the name.
+.TP
+.B add
+Add every track among the given files and directories to
+.IR playlist ,
+creating it if it does not exist.
+The paths must be inside the library.
+Tracks already in the playlist are reported and left alone.
+If the server does not know some of the tracks yet, it is asked to scan its
+library first, and
+.B add
+waits for the scan to finish.
+Tracks it still does not know are reported and nothing is changed;
+.B sync
+them to the remote first.
+.RS
+.TP
+.B \-\-dry\-run
+Print what would change, but do not change the playlist.
+.TP
+.B \-\-no\-scan
+Do not ask the server to scan for tracks it does not know.
+.RE
+.TP
+.B remove
+Remove from
+.I playlist
+every track that is one of the given paths or under one of the given
+directories.
+The paths must be inside the library, but need not exist, so tracks that
+were moved or deleted can be removed.
+A path that matches nothing in the playlist is an error.
+Without any
+.IR path ,
+the whole playlist is deleted.
+.RS
+.TP
+.B \-\-dry\-run
+Print what would be removed or deleted, but do not change anything.
+.RE
+.TP
+.B list
+Print the server's playlists, sorted by name, one per line:
+the name, a tab and the number of tracks, followed in brackets by
+.B public
+if the playlist is public and by its comment, if it has one.
+.TP
+.B show
+Print the path of every track in
+.IR playlist ,
+relative to the library, in playlist order.
+Tracks missing from the library are marked
+.BR "(not in library)" .
+.TP
+.B pull
+Save the server's playlists, or only the named ones, in the root of the
+library as
+.IR name .m3u8
+files: extended M3U playlists whose paths are relative to the library, so
+players reading the library find the tracks.
+Characters that cannot be in a file name, such as
+.B /
+and
+.BR : ,
+become
+.BR _ .
+Existing files are replaced; files that would not change are reported as
+.B unchanged
+and left alone.
+When two playlists would be saved in the same file, ignoring case, only the
+first is written and the other is reported as an error.
+.RS
+.TP
+.B \-\-dry\-run
+Print the files that would be written, but do not write them.
+.RE
+.PP
+The server keeps counting the tracks of a playlist whose files were moved or
+deleted, but leaves them out of the playlist.
+.BR show ,
+.B pull
+and
+.B list
+therefore may disagree on how many tracks a playlist has;
+.B show
+and
+.B pull
+say so on standard error.
+Add the moved tracks again with
+.BR "playlist add" .
 .SS "tag show"
 .B jukebox tag show
 .IR path ...
@@ -721,9 +887,10 @@ Accepted by
 .BR search ,
 .BR check ,
 .BR transcode ,
-.B remote
+.BR remote ,
+.B sync
 and
-.BR sync .
+.BR playlist .
 .TP
 .BR \-h ", " \-\-help
 Without a command, or as the command
@@ -769,10 +936,11 @@ and
 .BR "\-q:a 6" ;
 empty or unset keeps them);
 and, for each remote,
-.BI remote. name .url
-and
+.BI remote. name .url\fR,
 .BI remote. name .insecure
-(\fBtrue\fR or unset), written by
+(\fBtrue\fR or unset) and
+.BI remote. name .subsonic\fR,
+written by
 .BR "jukebox remote add" .
 .TP
 .IB library /.jukebox/sync/ name
@@ -796,15 +964,18 @@ are ignored, as are unknown keys.
 .SH ENVIRONMENT
 .TP
 .B JUKEBOX_PASSWORD
-The password for a remote whose URL has a user.
+The password for a remote whose URL has a user,
+and for a remote's Subsonic server.
 For
 .BR sftp ,
 it is only used when SSH keys were not accepted.
 When it is not set,
 .B sync
-looks in
+and
+.B playlist
+look in
 .IR ~/.netrc ,
-then asks on the terminal.
+then ask on the terminal.
 .TP
 .B XDG_CONFIG_HOME
 Where the config file is looked for.
@@ -884,5 +1055,18 @@ Sync the library with a phone running an FTP server, trying it out first:
 jukebox remote add phone ftp://me@192.168.1.20:2121/Music
 jukebox sync \-\-dry\-run phone
 jukebox sync phone
+.EE
+.RE
+.PP
+Give a remote served by gonic a playlist, then save its playlists in the
+library:
+.PP
+.RS
+.EX
+jukebox remote add \-\-subsonic https://me@music.example.org nas sftp://me@nas/music
+jukebox sync nas
+jukebox playlist add nas Favourites ~/Music/Rock/Radiohead/"OK Computer"
+jukebox playlist show nas Favourites
+jukebox playlist pull nas
 .EE
 .RE
