@@ -25,7 +25,7 @@ func TestM3U(t *testing.T) {
 		{ID: "1", Path: "Abba/Gold/01.flac"},
 		{ID: "2", Path: "/Queen//Hits/02.opus"},
 	}}
-	want := "#EXTM#U\n#PLAYLIST: Mix\nAbba/Gold/01.flac\nQueen/Hits/02.opus\n"
+	want := "#EXTM3U\n#PLAYLIST:Mix\nAbba/Gold/01.flac\nQueen/Hits/02.opus\n"
 	if got := string(m3u(p)); got != want {
 		t.Errorf("m3u = %q, want %q", got, want)
 	}
